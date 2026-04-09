@@ -1,11 +1,16 @@
-/// \brief This is the main orchestration class
+#pragma once
+
+#include <string>
+
+class VideoSource;
 
 class Pipeline {
 public:
-    explicit Pipeline(const std::string& source_path);
+    explicit Pipeline(const std::string& source);
+
     bool initialize();
     void run();
 
 private:
-    std::string source_path_;
+    std::string source_;
 };

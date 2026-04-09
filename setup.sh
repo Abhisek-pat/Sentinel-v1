@@ -1,54 +1,54 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Ensure script is run inside "Sentinel-v1"
-if [ "$(basename "$PWD")" != "Sentinel-v1" ]; then
-  echo "❌ Please run this script inside the 'Sentinel-v1' folder"
-  exit 1
-fi
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Creating project structure inside $(pwd)..."
+echo "Resetting Sentinel project structure in: $ROOT_DIR"
 
-# Create directories
-mkdir -p configs
-mkdir -p models/yolo
-mkdir -p src/app
-mkdir -p src/capture
-mkdir -p src/detection
-mkdir -p src/tracking
-mkdir -p src/events
-mkdir -p src/reasoning
-mkdir -p src/storage
-mkdir -p src/ui
-mkdir -p llm_service/prompt_templates
-mkdir -p data/videos
-mkdir -p data/outputs
-mkdir -p docs
+# Remove existing files/folders that should be recreated
+rm -rf \
+  "$ROOT_DIR/models" \
+  "$ROOT_DIR/data" \
+  "$ROOT_DIR/src" \
+  "$ROOT_DIR/include" \
+  "$ROOT_DIR/README.md"
 
-# Create files
-touch CMakeLists.txt
-touch README.md
+# Recreate directory structure
+mkdir -p "$ROOT_DIR/models/yolo"
+mkdir -p "$ROOT_DIR/data/videos"
+mkdir -p "$ROOT_DIR/src/app"
+mkdir -p "$ROOT_DIR/src/capture"
+mkdir -p "$ROOT_DIR/src/detection"
+mkdir -p "$ROOT_DIR/src/ui"
+mkdir -p "$ROOT_DIR/src/utils"
+mkdir -p "$ROOT_DIR/include"
 
-touch configs/default.yaml
-touch configs/zones.json
-touch configs/classes.json
+# Recreate files
+: > "$ROOT_DIR/CMakeLists.txt"
+: > "$ROOT_DIR/README.md"
 
-touch src/main.cpp
-touch src/app/pipeline.cpp
-touch src/capture/video_source.cpp
-touch src/detection/detector.cpp
-touch src/detection/postprocess.cpp
-touch src/tracking/tracker.cpp
-touch src/events/event_engine.cpp
-touch src/events/zone_logic.cpp
-touch src/reasoning/scene_state.cpp
-touch src/reasoning/llm_client.cpp
-touch src/storage/event_logger.cpp
-touch src/storage/metrics_logger.cpp
-touch src/ui/overlay_renderer.cpp
+: > "$ROOT_DIR/models/yolo/model.onnx"
+: > "$ROOT_DIR/data/videos/demo.mp4"
 
-touch llm_service/app.py
+: > "$ROOT_DIR/src/main.cpp"
 
-touch docs/architecture.md
-touch docs/performance.md
+: > "$ROOT_DIR/src/app/pipeline.h"
+: > "$ROOT_DIR/src/app/pipeline.cpp"
 
-echo "✅ Sentinel project structure created successfully!"
+: > "$ROOT_DIR/src/capture/video_source.h"
+: > "$ROOT_DIR/src/capture/video_source.cpp"
+
+: > "$ROOT_DIR/src/detection/detector.h"
+: > "$ROOT_DIR/src/detection/detector.cpp"
+: > "$ROOT_DIR/src/detection/yolo_onnx.h"
+: > "$ROOT_DIR/src/detection/yolo_onnx.cpp"
+: > "$ROOT_DIR/src/detection/postprocess.h"
+: > "$ROOT_DIR/src/detection/postprocess.cpp"
+
+: > "$ROOT_DIR/src/ui/overlay_renderer.h"
+: > "$ROOT_DIR/src/ui/overlay_renderer.cpp"
+
+: > "$ROOT_DIR/src/utils/timer.h"
+: > "$ROOT_DIR/src/utils/timer.cpp"
+
+echo "Done."
