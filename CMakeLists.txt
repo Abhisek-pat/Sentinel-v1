@@ -12,6 +12,8 @@ add_executable(sentinel
     src/main.cpp
     src/app/pipeline.cpp
     src/capture/video_source.cpp
+    src/ui/overlay_renderer.cpp
+    src/utils/timer.cpp
 )
 
 target_include_directories(sentinel PRIVATE

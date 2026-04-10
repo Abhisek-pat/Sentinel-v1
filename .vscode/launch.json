@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Sentinel (MSVC)",
+            "type": "cppvsdbg",
+            "request": "launch",
+
+            "program": "${workspaceFolder}/build/Release/sentinel.exe",
+            "args": ["0"],
+
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "${env:PATH};D:/Abhisek/opencv/build/x64/vc16/bin"
+                }
+            ],
+
+            "console": "integratedTerminal"
+        }
+    ]
+}
