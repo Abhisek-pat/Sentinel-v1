@@ -1,3 +1,0 @@
-D:/Abhisek/Projects/Sentinel-v1/build/CMakeFiles/sentinel.dir
-D:/Abhisek/Projects/Sentinel-v1/build/CMakeFiles/ALL_BUILD.dir
-D:/Abhisek/Projects/Sentinel-v1/build/CMakeFiles/ZERO_CHECK.dir
