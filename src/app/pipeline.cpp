@@ -1,6 +1,7 @@
 #include "app/pipeline.h"
 
 #include "capture/video_source.h"
+#include "detection/yolo_onnx.h"
 #include "ui/overlay_renderer.h"
 #include "utils/timer.h"
 
@@ -19,6 +20,14 @@ bool Pipeline::initialize() {
 
 void Pipeline::run() {
     std::cout << "[Sentinel] Entering run().\n";
+
+    const std::string model_path = "models/yolo/model.onnx";
+    YoloOnnxDetector detector(model_path);
+
+    if (!detector.initialize()) {
+        std::cerr << "[Sentinel] Failed to initialize detector.\n";
+        return;
+    }
 
     VideoSource video_source(source_);
 
