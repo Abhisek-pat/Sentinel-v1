@@ -25,6 +25,8 @@ add_executable(sentinel
     src/utils/timer.cpp
     src/detection/detector.cpp
     src/detection/yolo_onnx.cpp
+    src/tracking/tracker.cpp
+    src/events/event_engine.cpp
 )
 
 target_include_directories(sentinel PRIVATE

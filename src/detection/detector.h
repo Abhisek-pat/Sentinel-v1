@@ -6,10 +6,12 @@
 #include <vector>
 
 struct Detection {
-    int class_id;
-    std::string class_name;
-    float confidence;
+    int track_id{-1};
+    int class_id{-1};
+    std::string class_name{"unknown"};
+    float confidence{0.0f};
     cv::Rect box;
+    double dwell_time_sec{0.0};
 };
 
 struct DetectionResult {
