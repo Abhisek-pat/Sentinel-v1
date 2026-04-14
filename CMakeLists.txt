@@ -27,6 +27,8 @@ add_executable(sentinel
     src/detection/yolo_onnx.cpp
     src/tracking/tracker.cpp
     src/events/event_engine.cpp
+    src/zones/zone_manager.cpp
+    src/reasoning/scene_state.cpp
 )
 
 target_include_directories(sentinel PRIVATE
