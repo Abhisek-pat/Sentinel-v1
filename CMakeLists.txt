@@ -20,15 +20,21 @@ set(ONNXRUNTIME_LIB "${ONNXRUNTIME_LIB_DIR}/onnxruntime.lib")
 add_executable(sentinel
     src/main.cpp
     src/app/pipeline.cpp
+
     src/capture/video_source.cpp
-    src/ui/overlay_renderer.cpp
-    src/utils/timer.cpp
+
     src/detection/detector.cpp
     src/detection/yolo_onnx.cpp
+
     src/tracking/tracker.cpp
     src/events/event_engine.cpp
     src/zones/zone_manager.cpp
+
     src/reasoning/scene_state.cpp
+    src/reasoning/llm_client.cpp
+
+    src/ui/overlay_renderer.cpp
+    src/utils/timer.cpp
 )
 
 target_include_directories(sentinel PRIVATE
@@ -40,6 +46,7 @@ target_include_directories(sentinel PRIVATE
 target_link_libraries(sentinel PRIVATE
     ${OpenCV_LIBS}
     ${ONNXRUNTIME_LIB}
+    winhttp
 )
 
 if(MSVC)

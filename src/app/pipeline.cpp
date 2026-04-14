@@ -3,6 +3,7 @@
 #include "capture/video_source.h"
 #include "detection/yolo_onnx.h"
 #include "events/event_engine.h"
+#include "reasoning/llm_client.h"
 #include "reasoning/scene_state.h"
 #include "tracking/tracker.h"
 #include "ui/overlay_renderer.h"
@@ -45,6 +46,7 @@ void Pipeline::run() {
     EventEngine event_engine;
     ZoneManager zone_manager;
     SceneStateBuilder scene_state_builder;
+    LlmClient llm_client;
     OverlayRenderer overlay_renderer;
 
     cv::Mat frame;
@@ -54,7 +56,10 @@ void Pipeline::run() {
     double fps = 0.0;
     std::vector<std::string> recent_events;
     bool zones_initialized = false;
+
     double last_scene_print_time_sec = -1000.0;
+    double last_llm_call_time_sec = -1000.0;
+    std::string last_event_signature;
 
     std::cout << "[Sentinel] Starting frame loop.\n";
 
@@ -117,9 +122,37 @@ void Pipeline::run() {
             person_zones,
             person_loitering_flags);
 
+        const std::string scene_json = scene_state_builder.toJson(scene_state);
+
         if ((current_time_sec - last_scene_print_time_sec) >= 2.0) {
-            std::cout << "[SceneState]\n" << scene_state_builder.toJson(scene_state) << "\n";
+            std::cout << "[SceneState]\n" << scene_json << "\n";
             last_scene_print_time_sec = current_time_sec;
+        }
+
+        std::string current_event_signature;
+        if (!recent_events.empty()) {
+            current_event_signature = recent_events.back();
+        }
+
+        const bool should_call_llm =
+            ((current_time_sec - last_llm_call_time_sec) >= 5.0) ||
+            (!current_event_signature.empty() && current_event_signature != last_event_signature);
+
+        if (should_call_llm) {
+            std::cout << "[Sentinel] Calling LLM service...\n";
+
+            LlmResult llm_result = llm_client.reasonOverScene(scene_json);
+            if (llm_result.success) {
+                std::cout << "[LLM]\n";
+                std::cout << "Summary: " << llm_result.summary << "\n";
+                std::cout << "Risk: " << llm_result.risk_level << "\n";
+                std::cout << "Action: " << llm_result.recommended_action << "\n";
+            } else {
+                std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
+            }
+
+            last_llm_call_time_sec = current_time_sec;
+            last_event_signature = current_event_signature;
         }
 
         const double frame_time_ms = frame_timer.elapsedMilliseconds();
