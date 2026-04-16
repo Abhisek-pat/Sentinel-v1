@@ -19,14 +19,19 @@ public:
 
     void drawEvents(cv::Mat& frame,
                     const std::vector<std::string>& events) const;
-    
+
     void drawLlmOutput(cv::Mat& frame,
-                   const std::string& summary,
-                   const std::string& risk_level) const;
+                       const std::string& summary,
+                       const std::string& risk_level) const;
 
 private:
     void drawTextLine(cv::Mat& frame,
                       const std::string& text,
                       int x,
-                      int y) const;
+                      int y,
+                      double scale = 0.7,
+                      const cv::Scalar& color = cv::Scalar(0, 255, 0),
+                      int thickness = 2) const;
+
+    static std::string truncateText(const std::string& text, std::size_t max_len);
 };

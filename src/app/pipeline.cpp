@@ -185,6 +185,7 @@ void Pipeline::run() {
         zone_manager.drawZones(frame);
         overlay_renderer.drawDetections(frame, person_detections);
         overlay_renderer.drawStats(frame, fps, frame_time_ms, source_label);
+        overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
         overlay_renderer.drawEvents(frame, recent_events);
 
         // 🔥 LLM overlay
