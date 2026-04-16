@@ -94,3 +94,26 @@ void OverlayRenderer::drawTextLine(cv::Mat& frame,
                 2,
                 cv::LINE_AA);
 }
+
+void OverlayRenderer::drawLlmOutput(cv::Mat& frame,
+                                     const std::string& summary,
+                                     const std::string& risk_level) const {
+    int y = frame.rows - 100;
+
+    std::string risk_text = "Risk: " + risk_level;
+    cv::Scalar color = (risk_level == "high") ? cv::Scalar(0,0,255) :
+                        (risk_level == "medium") ? cv::Scalar(0,255,255) :
+                                                   cv::Scalar(0,255,0);
+
+    cv::putText(frame, risk_text,
+                cv::Point(10, y),
+                cv::FONT_HERSHEY_SIMPLEX,
+                0.7, color, 2);
+
+    y += 25;
+
+    cv::putText(frame, summary,
+                cv::Point(10, y),
+                cv::FONT_HERSHEY_SIMPLEX,
+                0.5, cv::Scalar(255,255,255), 1);
+}

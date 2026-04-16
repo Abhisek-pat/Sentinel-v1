@@ -23,11 +23,10 @@ def reason_over_scene(req: SceneRequest) -> dict[str, Any]:
     scene_json = json.dumps(req.scene_state, indent=2)
 
     developer_prompt = (
-        "You are a surveillance reasoning engine. "
-        "Use only the provided structured scene state. "
-        "Do not invent people, zones, or events. "
-        "Return strict JSON with summary, risk_level, and recommended_action."
-    )
+    "You are a surveillance AI. "
+    "Be concise. Do not repeat obvious details. "
+    "Focus on risk and actionable insights only."
+)
 
     user_prompt = f"""
 Given this scene state:

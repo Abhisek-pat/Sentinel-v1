@@ -61,6 +61,10 @@ void Pipeline::run() {
     double last_llm_call_time_sec = -1000.0;
     std::string last_event_signature;
 
+    // 🔥 LLM state
+    std::string llm_summary = "Initializing...";
+    std::string llm_risk = "unknown";
+
     std::cout << "[Sentinel] Starting frame loop.\n";
 
     Timer app_timer;
@@ -85,12 +89,14 @@ void Pipeline::run() {
 
         const double current_time_sec = app_timer.elapsedMilliseconds() / 1000.0;
 
+        // 🔹 Event Engine
         std::vector<std::string> frame_events = event_engine.update(tracked_detections, current_time_sec);
         for (const auto& event : frame_events) {
             std::cout << event << "\n";
             recent_events.push_back(event);
         }
 
+        // 🔹 Zone Engine
         std::vector<ZoneEvent> zone_events = zone_manager.update(tracked_detections, current_time_sec);
         for (const auto& zone_event : zone_events) {
             std::cout << zone_event.message << "\n";
@@ -103,6 +109,7 @@ void Pipeline::run() {
                 recent_events.begin() + static_cast<std::ptrdiff_t>(recent_events.size() - 10));
         }
 
+        // 🔹 Filter persons
         std::vector<Detection> person_detections;
         std::vector<std::string> person_zones;
         std::vector<bool> person_loitering_flags;
@@ -115,6 +122,7 @@ void Pipeline::run() {
             }
         }
 
+        // 🔹 Build scene state
         SceneState scene_state = scene_state_builder.build(
             current_time_sec,
             person_detections,
@@ -129,6 +137,7 @@ void Pipeline::run() {
             last_scene_print_time_sec = current_time_sec;
         }
 
+        // 🔹 LLM Trigger logic
         std::string current_event_signature;
         if (!recent_events.empty()) {
             current_event_signature = recent_events.back();
@@ -142,11 +151,16 @@ void Pipeline::run() {
             std::cout << "[Sentinel] Calling LLM service...\n";
 
             LlmResult llm_result = llm_client.reasonOverScene(scene_json);
+
             if (llm_result.success) {
                 std::cout << "[LLM]\n";
                 std::cout << "Summary: " << llm_result.summary << "\n";
                 std::cout << "Risk: " << llm_result.risk_level << "\n";
                 std::cout << "Action: " << llm_result.recommended_action << "\n";
+
+                // 🔥 Store result for overlay
+                llm_summary = llm_result.summary;
+                llm_risk = llm_result.risk_level;
             } else {
                 std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
             }
@@ -155,6 +169,7 @@ void Pipeline::run() {
             last_event_signature = current_event_signature;
         }
 
+        // 🔹 FPS
         const double frame_time_ms = frame_timer.elapsedMilliseconds();
 
         if (frame_time_ms > 0.0) {
@@ -166,10 +181,14 @@ void Pipeline::run() {
             }
         }
 
+        // 🔹 Rendering
         zone_manager.drawZones(frame);
         overlay_renderer.drawDetections(frame, person_detections);
         overlay_renderer.drawStats(frame, fps, frame_time_ms, source_label);
         overlay_renderer.drawEvents(frame, recent_events);
+
+        // 🔥 LLM overlay
+        overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
 
         cv::imshow(window_name, frame);
 
