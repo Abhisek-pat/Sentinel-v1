@@ -18,6 +18,8 @@ public:
 
 private:
     bool isWebcamSource() const;
+    bool isRtspSource() const;
+    bool openInternal();
 
 private:
     std::string source_;

@@ -9,10 +9,26 @@ bool VideoSource::isWebcamSource() const {
     return source_.empty() || source_ == "0";
 }
 
-bool VideoSource::open() {
+bool VideoSource::isRtspSource() const {
+    return source_.rfind("rtsp://", 0) == 0;
+}
+
+bool VideoSource::openInternal() {
     if (isWebcamSource()) {
         std::cout << "[Sentinel] Opening webcam.\n";
+#ifdef _WIN32
+        cap_.open(0, cv::CAP_DSHOW);
+#else
         cap_.open(0);
+#endif
+    } else if (isRtspSource()) {
+        std::cout << "[Sentinel] Opening RTSP stream: " << source_ << "\n";
+
+        // Prefer FFmpeg for RTSP streams
+        cap_.open(source_, cv::CAP_FFMPEG);
+
+        // Best-effort latency reduction
+        cap_.set(cv::CAP_PROP_BUFFERSIZE, 1);
     } else {
         std::cout << "[Sentinel] Opening video file: " << source_ << "\n";
         cap_.open(source_);
@@ -31,12 +47,38 @@ bool VideoSource::open() {
     return true;
 }
 
+bool VideoSource::open() {
+    return openInternal();
+}
+
 bool VideoSource::read(cv::Mat& frame) {
     if (!cap_.isOpened()) {
         return false;
     }
 
-    return cap_.read(frame) && !frame.empty();
+    if (cap_.read(frame) && !frame.empty()) {
+        return true;
+    }
+
+    // Try a simple reconnect for RTSP streams
+    if (isRtspSource()) {
+        std::cerr << "[Sentinel] RTSP read failed. Attempting reconnect...\n";
+        cap_.release();
+
+        if (!openInternal()) {
+            std::cerr << "[Sentinel] RTSP reconnect failed.\n";
+            return false;
+        }
+
+        if (cap_.read(frame) && !frame.empty()) {
+            std::cout << "[Sentinel] RTSP reconnect successful.\n";
+            return true;
+        }
+
+        std::cerr << "[Sentinel] RTSP reconnect read failed.\n";
+    }
+
+    return false;
 }
 
 bool VideoSource::isOpened() const {
