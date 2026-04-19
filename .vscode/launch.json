@@ -6,7 +6,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Release/sentinel.exe",
-            "args": ["0"],
+            "args": ["rtsp://kunmunTapoCam:LeezaSonali_07@192.168.1.225:554/stream2"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
