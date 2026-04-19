@@ -57,10 +57,12 @@ void OverlayRenderer::drawStats(cv::Mat& frame,
                                 double fps,
                                 double frame_time_ms,
                                 const std::string& source_label) const {
+    (void)source_label;
+
     const int panel_x = 10;
     const int panel_y = 10;
-    const int panel_w = 280;
-    const int panel_h = 110;
+    const int panel_w = 250;
+    const int panel_h = 85;
 
     cv::rectangle(frame,
                   cv::Rect(panel_x, panel_y, panel_w, panel_h),
@@ -76,9 +78,6 @@ void OverlayRenderer::drawStats(cv::Mat& frame,
     drawTextLine(frame, "Sentinel", panel_x + 10, y, 0.8, cv::Scalar(0, 255, 0), 2);
     y += 28;
 
-    drawTextLine(frame, "Source: " + source_label, panel_x + 10, y, 0.6, cv::Scalar(255, 255, 255), 1);
-    y += 24;
-
     drawTextLine(frame, "FPS: " + cv::format("%.2f", fps), panel_x + 10, y, 0.6, cv::Scalar(255, 255, 255), 1);
     y += 24;
 
@@ -87,8 +86,8 @@ void OverlayRenderer::drawStats(cv::Mat& frame,
 
 void OverlayRenderer::drawEvents(cv::Mat& frame,
                                  const std::vector<std::string>& events) const {
-    const int panel_w = 420;
-    const int panel_h = 90;
+    const int panel_w = 390;
+    const int panel_h = 85;
     const int panel_x = frame.cols - panel_w - 10;
     const int panel_y = frame.rows - panel_h - 10;
 
@@ -109,7 +108,7 @@ void OverlayRenderer::drawEvents(cv::Mat& frame,
 
     for (auto it = events.rbegin(); it != events.rend() && count < 2; ++it, ++count) {
         drawTextLine(frame,
-                     truncateText(*it, 58),
+                     truncateText(*it, 52),
                      panel_x + 10,
                      y,
                      0.45,
@@ -124,8 +123,8 @@ void OverlayRenderer::drawLlmOutput(cv::Mat& frame,
                                     const std::string& risk_level) const {
     const int panel_x = 10;
     const int panel_h = 95;
-    const int panel_w = 520;
-    const int panel_y = frame.rows - panel_h - 10;
+    const int panel_w = 430;
+    const int panel_y = frame.rows - panel_h - 105;
 
     cv::rectangle(frame,
                   cv::Rect(panel_x, panel_y, panel_w, panel_h),
@@ -155,17 +154,17 @@ void OverlayRenderer::drawLlmOutput(cv::Mat& frame,
     drawTextLine(frame,
                  "Risk: " + risk_level,
                  panel_x + 10,
-                 panel_y + 48,
+                 panel_y + 50,
                  0.75,
                  risk_color,
                  2);
 
-    const std::string short_summary = truncateText(summary, 75);
+    const std::string short_summary = truncateText(summary, 58);
     drawTextLine(frame,
                  short_summary,
                  panel_x + 10,
-                 panel_y + 75,
-                 0.5,
+                 panel_y + 78,
+                 0.48,
                  cv::Scalar(255, 255, 255),
                  1);
 }
