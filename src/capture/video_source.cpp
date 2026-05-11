@@ -1,6 +1,7 @@
 #include "capture/video_source.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <thread>
 
@@ -30,17 +31,34 @@ bool VideoSource::isRtspSource() const {
 bool VideoSource::openInternal() {
     if (isWebcamSource()) {
         std::cout << "[Sentinel] Opening webcam.\n";
+
 #ifdef _WIN32
         cap_.open(0, cv::CAP_DSHOW);
 #else
         cap_.open(0);
 #endif
+
     } else if (isRtspSource()) {
-        std::cout << "[Sentinel] Opening RTSP stream: " << source_ << "\n";
+        std::cout << "[Sentinel] Opening RTSP stream.\n";
+
+#ifdef _WIN32
+        _putenv_s(
+            "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+            "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;0"
+        );
+#else
+        setenv(
+            "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+            "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;0",
+            1
+        );
+#endif
+
         cap_.open(source_, cv::CAP_FFMPEG);
 
-        // Best-effort settings; support depends on backend.
+        // Best-effort low-buffer setting. Backend support varies.
         cap_.set(cv::CAP_PROP_BUFFERSIZE, 1);
+
     } else {
         std::cout << "[Sentinel] Opening video file: " << source_ << "\n";
         cap_.open(source_);
@@ -75,10 +93,14 @@ bool VideoSource::open() {
 void VideoSource::captureLoop() {
     while (running_) {
         cv::Mat frame;
+
         if (cap_.read(frame) && !frame.empty()) {
             {
                 std::lock_guard<std::mutex> lock(frame_mutex_);
-                latest_frame_ = frame.clone();
+
+                // Avoid an extra clone here. read() will clone before handing
+                // the frame to the processing pipeline.
+                latest_frame_ = frame;
                 frame_ready_ = true;
             }
         } else {

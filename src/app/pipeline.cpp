@@ -5,6 +5,7 @@
 #include "events/event_engine.h"
 #include "reasoning/llm_client.h"
 #include "reasoning/scene_state.h"
+#include "recording/frame_ring_buffer.h"
 #include "tracking/tracker.h"
 #include "ui/overlay_renderer.h"
 #include "utils/timer.h"
@@ -12,9 +13,28 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
+namespace {
+void ensureDirectoryExists(const char* path) {
+#ifdef _WIN32
+    _mkdir(path);
+#else
+    mkdir(path, 0755);
+#endif
+}
+}
 
 Pipeline::Pipeline(const std::string& source)
     : source_(source) {}
@@ -68,9 +88,16 @@ void Pipeline::run() {
 
     int frame_count = 0;
 
-    // Displayed metrics
     double pipeline_fps = 0.0;
     double displayed_frame_time_ms = 0.0;
+
+    // Event clip recording
+    ensureDirectoryExists("data");
+    ensureDirectoryExists("data/clips");
+
+    FrameRingBuffer clip_buffer(60);
+    int clip_id = 0;
+    double last_clip_save_time_sec = -1000.0;
 
     std::cout << "[Sentinel] Starting frame loop.\n";
 
@@ -78,12 +105,12 @@ void Pipeline::run() {
     app_timer.start();
 
     while (true) {
-        Timer loop_timer;
-        loop_timer.start();
-
         if (!video_source.read(frame)) {
             continue;
         }
+
+        // Store latest raw frame for event clip capture.
+        clip_buffer.push(frame);
 
         if (!zones_initialized) {
             zone_manager.initialize(frame.cols, frame.rows);
@@ -97,6 +124,8 @@ void Pipeline::run() {
             Timer processing_timer;
             processing_timer.start();
 
+            bool should_save_event_clip = false;
+
             DetectionResult detection_result = detector.detect(frame);
             tracked_detections = tracker.update(detection_result.detections);
 
@@ -104,6 +133,7 @@ void Pipeline::run() {
 
             std::vector<std::string> frame_events =
                 event_engine.update(tracked_detections, current_time_sec);
+
             for (const auto& event : frame_events) {
                 std::cout << event << "\n";
                 recent_events.push_back(event);
@@ -111,9 +141,30 @@ void Pipeline::run() {
 
             std::vector<ZoneEvent> zone_events =
                 zone_manager.update(tracked_detections, current_time_sec);
+
             for (const auto& zone_event : zone_events) {
                 std::cout << zone_event.message << "\n";
                 recent_events.push_back(zone_event.message);
+
+                if (zone_event.message.find("loitering") != std::string::npos) {
+                    should_save_event_clip = true;
+                }
+            }
+
+            if (should_save_event_clip &&
+                (current_time_sec - last_clip_save_time_sec) >= 10.0) {
+                std::ostringstream clip_path;
+                clip_path << "data/clips/event_"
+                          << std::setw(4) << std::setfill('0') << clip_id++
+                          << "_t" << static_cast<int>(current_time_sec)
+                          << ".avi";
+
+                if (clip_buffer.saveToVideo(clip_path.str(), 10.0)) {
+                    std::cout << "[Sentinel] Event clip saved: "
+                              << clip_path.str() << "\n";
+                }
+
+                last_clip_save_time_sec = current_time_sec;
             }
 
             if (recent_events.size() > 10) {
@@ -205,8 +256,6 @@ void Pipeline::run() {
             std::cout << "[Sentinel] Exit requested by user.\n";
             break;
         }
-
-        (void)loop_timer;
     }
 
     cv::destroyAllWindows();
