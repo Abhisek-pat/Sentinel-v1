@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -36,4 +37,7 @@ private:
 
     std::atomic<bool> running_{false};
     std::atomic<bool> frame_ready_{false};
+
+    std::uint64_t latest_frame_id_{0};
+    std::uint64_t delivered_frame_id_{0};
 };

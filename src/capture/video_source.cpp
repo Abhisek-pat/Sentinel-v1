@@ -55,8 +55,6 @@ bool VideoSource::openInternal() {
 #endif
 
         cap_.open(source_, cv::CAP_FFMPEG);
-
-        // Best-effort low-buffer setting. Backend support varies.
         cap_.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
     } else {
@@ -98,9 +96,8 @@ void VideoSource::captureLoop() {
             {
                 std::lock_guard<std::mutex> lock(frame_mutex_);
 
-                // Avoid an extra clone here. read() will clone before handing
-                // the frame to the processing pipeline.
                 latest_frame_ = frame;
+                latest_frame_id_++;
                 frame_ready_ = true;
             }
         } else {
@@ -121,11 +118,19 @@ bool VideoSource::read(cv::Mat& frame) {
         }
 
         std::lock_guard<std::mutex> lock(frame_mutex_);
+
         if (latest_frame_.empty()) {
             return false;
         }
 
+        // Critical fix:
+        // Do not return the same RTSP frame again and again.
+        if (latest_frame_id_ == delivered_frame_id_) {
+            return false;
+        }
+
         frame = latest_frame_.clone();
+        delivered_frame_id_ = latest_frame_id_;
         return true;
     }
 
