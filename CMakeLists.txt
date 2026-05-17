@@ -35,6 +35,8 @@ add_executable(sentinel
 
     src/ui/overlay_renderer.cpp
     src/utils/timer.cpp
+
+    src/recording/frame_ring_buffer.cpp
 )
 
 target_include_directories(sentinel PRIVATE

@@ -5,6 +5,7 @@
 #include "events/event_engine.h"
 #include "reasoning/llm_client.h"
 #include "reasoning/scene_state.h"
+#include "recording/frame_ring_buffer.h"
 #include "tracking/tracker.h"
 #include "ui/overlay_renderer.h"
 #include "utils/timer.h"
@@ -12,9 +13,44 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <chrono>
+#include <future>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+#include <thread>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
+namespace {
+
+void ensureDirectoryExists(const char* path) {
+#ifdef _WIN32
+    _mkdir(path);
+#else
+    mkdir(path, 0755);
+#endif
+}
+
+bool isImportantForUi(const std::string& event) {
+    return event.find("loitering") != std::string::npos ||
+           event.find("exited") != std::string::npos ||
+           event.find("entered scene") != std::string::npos;
+}
+
+bool isImportantForLlm(const std::string& event) {
+    return event.find("loitering") != std::string::npos ||
+           event.find("exited scene") != std::string::npos;
+}
+
+}  // namespace
 
 Pipeline::Pipeline(const std::string& source)
     : source_(source) {}
@@ -51,19 +87,36 @@ void Pipeline::run() {
 
     cv::Mat frame;
     const std::string window_name = "Sentinel";
-    const std::string source_label = (source_.empty() || source_ == "0") ? "webcam" : source_;
+    const std::string source_label = "";
 
-    double fps = 0.0;
     std::vector<std::string> recent_events;
     bool zones_initialized = false;
 
     double last_scene_print_time_sec = -1000.0;
     double last_llm_call_time_sec = -1000.0;
-    std::string last_event_signature;
+    double last_clip_save_time_sec = -1000.0;
 
-    // 🔥 LLM state
-    std::string llm_summary = "Initializing...";
-    std::string llm_risk = "unknown";
+    std::string last_llm_event_signature;
+
+    std::string llm_summary = "Waiting for scene update...";
+    std::string llm_risk = "low";
+
+    std::future<LlmResult> llm_future;
+    bool llm_request_in_flight = false;
+
+    std::vector<Detection> tracked_detections;
+    std::vector<Detection> person_detections;
+
+    int frame_count = 0;
+
+    double pipeline_fps = 0.0;
+    double displayed_frame_time_ms = 0.0;
+
+    ensureDirectoryExists("data");
+    ensureDirectoryExists("data/clips");
+
+    FrameRingBuffer clip_buffer(60);
+    int clip_id = 0;
 
     std::cout << "[Sentinel] Starting frame loop.\n";
 
@@ -71,124 +124,211 @@ void Pipeline::run() {
     app_timer.start();
 
     while (true) {
-        Timer frame_timer;
-        frame_timer.start();
-
         if (!video_source.read(frame)) {
-            std::cout << "[Sentinel] End of stream or failed frame read.\n";
-            break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            continue;
         }
+
+        clip_buffer.push(frame);
 
         if (!zones_initialized) {
             zone_manager.initialize(frame.cols, frame.rows);
             zones_initialized = true;
         }
 
-        DetectionResult detection_result = detector.detect(frame);
-        std::vector<Detection> tracked_detections = tracker.update(detection_result.detections);
+        frame_count++;
+        const bool run_inference_this_frame = (frame_count % 2 == 0);
 
-        const double current_time_sec = app_timer.elapsedMilliseconds() / 1000.0;
+        if (run_inference_this_frame) {
+            Timer processing_timer;
+            processing_timer.start();
 
-        // 🔹 Event Engine
-        std::vector<std::string> frame_events = event_engine.update(tracked_detections, current_time_sec);
-        for (const auto& event : frame_events) {
-            std::cout << event << "\n";
-            recent_events.push_back(event);
-        }
+            bool should_save_event_clip = false;
+            bool important_event_for_llm = false;
+            std::string current_llm_event_signature;
 
-        // 🔹 Zone Engine
-        std::vector<ZoneEvent> zone_events = zone_manager.update(tracked_detections, current_time_sec);
-        for (const auto& zone_event : zone_events) {
-            std::cout << zone_event.message << "\n";
-            recent_events.push_back(zone_event.message);
-        }
+            DetectionResult detection_result = detector.detect(frame);
+            tracked_detections = tracker.update(detection_result.detections);
 
-        if (recent_events.size() > 10) {
-            recent_events.erase(
-                recent_events.begin(),
-                recent_events.begin() + static_cast<std::ptrdiff_t>(recent_events.size() - 10));
-        }
+            const double current_time_sec = app_timer.elapsedMilliseconds() / 1000.0;
 
-        // 🔹 Filter persons
-        std::vector<Detection> person_detections;
-        std::vector<std::string> person_zones;
-        std::vector<bool> person_loitering_flags;
+            std::vector<std::string> frame_events =
+                event_engine.update(tracked_detections, current_time_sec);
 
-        for (const auto& det : tracked_detections) {
-            if (det.class_name == "person") {
-                person_detections.push_back(det);
-                person_zones.push_back(zone_manager.getZoneForTrack(det.track_id));
-                person_loitering_flags.push_back(zone_manager.isTrackLoitering(det.track_id));
+            for (const auto& event : frame_events) {
+                std::cout << event << "\n";
+
+                if (isImportantForUi(event)) {
+                    recent_events.push_back(event);
+                }
+
+                if (isImportantForLlm(event)) {
+                    important_event_for_llm = true;
+                    current_llm_event_signature = event;
+                }
+            }
+
+            std::vector<ZoneEvent> zone_events =
+                zone_manager.update(tracked_detections, current_time_sec);
+
+            for (const auto& zone_event : zone_events) {
+                std::cout << zone_event.message << "\n";
+
+                if (zone_event.message.find("loitering") != std::string::npos) {
+                    should_save_event_clip = true;
+                    important_event_for_llm = true;
+                    current_llm_event_signature = zone_event.message;
+                    recent_events.push_back(zone_event.message);
+                } else if (zone_event.message.find("exited") != std::string::npos) {
+                    recent_events.push_back(zone_event.message);
+                }
+            }
+
+            if (should_save_event_clip &&
+                (current_time_sec - last_clip_save_time_sec) >= 10.0) {
+                std::ostringstream clip_path;
+                clip_path << "data/clips/event_"
+                          << std::setw(4) << std::setfill('0') << clip_id++
+                          << "_t" << static_cast<int>(current_time_sec)
+                          << ".avi";
+
+                if (clip_buffer.saveToVideo(clip_path.str(), 10.0)) {
+                    std::cout << "[Sentinel] Event clip saved: "
+                              << clip_path.str() << "\n";
+                }
+
+                last_clip_save_time_sec = current_time_sec;
+            }
+
+            if (recent_events.size() > 10) {
+                recent_events.erase(
+                    recent_events.begin(),
+                    recent_events.begin() + static_cast<std::ptrdiff_t>(recent_events.size() - 10));
+            }
+
+            person_detections.clear();
+
+            std::vector<std::string> person_zones;
+            std::vector<bool> person_loitering_flags;
+
+            for (const auto& det : tracked_detections) {
+                if (det.class_name == "person") {
+                    person_detections.push_back(det);
+                    person_zones.push_back(zone_manager.getZoneForTrack(det.track_id));
+                    person_loitering_flags.push_back(zone_manager.isTrackLoitering(det.track_id));
+                }
+            }
+
+            SceneState scene_state = scene_state_builder.build(
+                current_time_sec,
+                person_detections,
+                recent_events,
+                person_zones,
+                person_loitering_flags);
+
+            const std::string scene_json = scene_state_builder.toJson(scene_state);
+
+            if ((current_time_sec - last_scene_print_time_sec) >= 3.0) {
+                std::cout << "[SceneState]\n" << scene_json << "\n";
+                last_scene_print_time_sec = current_time_sec;
+            }
+
+            if (person_detections.empty() && !llm_request_in_flight) {
+                llm_summary = "No active person detected.";
+                llm_risk = "low";
+            }
+
+            const bool has_person = !person_detections.empty();
+            const bool initial_scene_update =
+                has_person &&
+                llm_summary == "Waiting for scene update..." &&
+                current_time_sec >= 3.0;
+
+            const bool should_call_llm =
+                !llm_request_in_flight &&
+                ((important_event_for_llm &&
+                  !current_llm_event_signature.empty() &&
+                  current_llm_event_signature != last_llm_event_signature &&
+                  (current_time_sec - last_llm_call_time_sec) >= 10.0) ||
+                 initial_scene_update);
+
+            if (should_call_llm) {
+                std::cout << "[Sentinel] Dispatching async LLM request...\n";
+
+                const std::string scene_json_copy = scene_json;
+
+                llm_future = std::async(
+                    std::launch::async,
+                    [&llm_client, scene_json_copy]() {
+                        return llm_client.reasonOverScene(scene_json_copy);
+                    });
+
+                llm_request_in_flight = true;
+                last_llm_call_time_sec = current_time_sec;
+
+                if (!current_llm_event_signature.empty()) {
+                    last_llm_event_signature = current_llm_event_signature;
+                }
+            }
+
+            if (llm_request_in_flight &&
+                llm_future.valid() &&
+                llm_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+                LlmResult llm_result = llm_future.get();
+
+                if (llm_result.success) {
+                    std::cout << "[LLM]\n";
+                    std::cout << "Summary: " << llm_result.summary << "\n";
+                    std::cout << "Risk: " << llm_result.risk_level << "\n";
+                    std::cout << "Action: " << llm_result.recommended_action << "\n";
+
+                    llm_summary = llm_result.summary;
+                    llm_risk = llm_result.risk_level;
+                } else {
+                    std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
+                }
+
+                llm_request_in_flight = false;
+            }
+
+            const double processing_time_ms = processing_timer.elapsedMilliseconds();
+            displayed_frame_time_ms = processing_time_ms;
+
+            if (processing_time_ms > 0.0) {
+                const double instant_pipeline_fps = 1000.0 / processing_time_ms;
+                if (pipeline_fps == 0.0) {
+                    pipeline_fps = instant_pipeline_fps;
+                } else {
+                    pipeline_fps = 0.9 * pipeline_fps + 0.1 * instant_pipeline_fps;
+                }
+            }
+        } else {
+            if (llm_request_in_flight &&
+                llm_future.valid() &&
+                llm_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+                LlmResult llm_result = llm_future.get();
+
+                if (llm_result.success) {
+                    std::cout << "[LLM]\n";
+                    std::cout << "Summary: " << llm_result.summary << "\n";
+                    std::cout << "Risk: " << llm_result.risk_level << "\n";
+                    std::cout << "Action: " << llm_result.recommended_action << "\n";
+
+                    llm_summary = llm_result.summary;
+                    llm_risk = llm_result.risk_level;
+                } else {
+                    std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
+                }
+
+                llm_request_in_flight = false;
             }
         }
 
-        // 🔹 Build scene state
-        SceneState scene_state = scene_state_builder.build(
-            current_time_sec,
-            person_detections,
-            recent_events,
-            person_zones,
-            person_loitering_flags);
-
-        const std::string scene_json = scene_state_builder.toJson(scene_state);
-
-        if ((current_time_sec - last_scene_print_time_sec) >= 2.0) {
-            std::cout << "[SceneState]\n" << scene_json << "\n";
-            last_scene_print_time_sec = current_time_sec;
-        }
-
-        // 🔹 LLM Trigger logic
-        std::string current_event_signature;
-        if (!recent_events.empty()) {
-            current_event_signature = recent_events.back();
-        }
-
-        const bool should_call_llm =
-            ((current_time_sec - last_llm_call_time_sec) >= 5.0) ||
-            (!current_event_signature.empty() && current_event_signature != last_event_signature);
-
-        if (should_call_llm) {
-            std::cout << "[Sentinel] Calling LLM service...\n";
-
-            LlmResult llm_result = llm_client.reasonOverScene(scene_json);
-
-            if (llm_result.success) {
-                std::cout << "[LLM]\n";
-                std::cout << "Summary: " << llm_result.summary << "\n";
-                std::cout << "Risk: " << llm_result.risk_level << "\n";
-                std::cout << "Action: " << llm_result.recommended_action << "\n";
-
-                // 🔥 Store result for overlay
-                llm_summary = llm_result.summary;
-                llm_risk = llm_result.risk_level;
-            } else {
-                std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
-            }
-
-            last_llm_call_time_sec = current_time_sec;
-            last_event_signature = current_event_signature;
-        }
-
-        // 🔹 FPS
-        const double frame_time_ms = frame_timer.elapsedMilliseconds();
-
-        if (frame_time_ms > 0.0) {
-            const double instant_fps = 1000.0 / frame_time_ms;
-            if (fps == 0.0) {
-                fps = instant_fps;
-            } else {
-                fps = 0.9 * fps + 0.1 * instant_fps;
-            }
-        }
-
-        // 🔹 Rendering
         zone_manager.drawZones(frame);
         overlay_renderer.drawDetections(frame, person_detections);
-        overlay_renderer.drawStats(frame, fps, frame_time_ms, source_label);
-        overlay_renderer.drawEvents(frame, recent_events);
-
-        // 🔥 LLM overlay
+        overlay_renderer.drawStats(frame, pipeline_fps, displayed_frame_time_ms, source_label);
         overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
+        overlay_renderer.drawEvents(frame, recent_events);
 
         cv::imshow(window_name, frame);
 

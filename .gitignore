@@ -38,3 +38,7 @@ Makefile
 
 .DS_Store
 Thumbs.db
+
+data/clips/
+__pycache__/
+*.pyc
