@@ -57,7 +57,7 @@ bool Pipeline::initialize() {
 void Pipeline::run() {
     std::cout << "[Sentinel] Entering run().\n";
 
-    const std::string model_path = "models/yolo/model.onnx";
+    const std::string model_path = "models/yolo/model_320.onnx";
     YoloOnnxDetector detector(model_path);
 
     if (!detector.initialize()) {
@@ -127,7 +127,7 @@ void Pipeline::run() {
 
         // For Pi, keep this at every 2nd frame first.
         // If Pi struggles, change 2 to 3 or 4.
-        const bool run_inference_this_frame = (frame_count % 2 == 0);
+        const bool run_inference_this_frame = (frame_count % 3 == 0);
 
         if (run_inference_this_frame) {
             Timer processing_timer;

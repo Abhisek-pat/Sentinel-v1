@@ -139,8 +139,8 @@ void YoloOnnxDetector::printModelInfo() {
 YoloOnnxDetector::LetterboxInfo YoloOnnxDetector::preprocess(const cv::Mat& frame) const {
     LetterboxInfo info;
 
-    const int target_width = 640;
-    const int target_height = 640;
+    const int target_width = 320;
+    const int target_height = 320;
 
     const int original_width = frame.cols;
     const int original_height = frame.rows;
@@ -293,7 +293,7 @@ DetectionResult YoloOnnxDetector::detect(const cv::Mat& frame) {
     LetterboxInfo prep = preprocess(frame);
     result.preprocess_ms = preprocess_timer.elapsedMilliseconds();
 
-    std::vector<int64_t> input_dims = {1, 3, 640, 640};
+    std::vector<int64_t> input_dims = {1, 3, 320, 320};
 
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(
         OrtArenaAllocator, OrtMemTypeDefault);

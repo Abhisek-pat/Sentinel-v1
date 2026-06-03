@@ -1,8 +1,9 @@
 from ultralytics import YOLO
 
-def main() -> None:
-    model = YOLO("yolov8n.pt")
-    model.export(format="onnx")
+model = YOLO("yolov8n.pt")
 
-if __name__ == "__main__":
-    main()
+model.export(
+    format="onnx",
+    imgsz=320,
+    simplify=True
+)
