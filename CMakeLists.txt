@@ -14,13 +14,16 @@ if(NOT ONNXRUNTIME_DIR)
 endif()
 
 set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_DIR}/include")
-set(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_DIR}/lib")
-set(ONNXRUNTIME_LIB "${ONNXRUNTIME_LIB_DIR}/onnxruntime.lib")
+
+if(WIN32)
+    set(ONNXRUNTIME_LIB "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib")
+else()
+    set(ONNXRUNTIME_LIB "${ONNXRUNTIME_DIR}/lib/libonnxruntime.so")
+endif()
 
 add_executable(sentinel
     src/main.cpp
     src/app/pipeline.cpp
-
     src/capture/video_source.cpp
 
     src/detection/detector.cpp
@@ -31,12 +34,10 @@ add_executable(sentinel
     src/zones/zone_manager.cpp
 
     src/reasoning/scene_state.cpp
-    src/reasoning/llm_client.cpp
+    src/recording/frame_ring_buffer.cpp
 
     src/ui/overlay_renderer.cpp
     src/utils/timer.cpp
-
-    src/recording/frame_ring_buffer.cpp
 )
 
 target_include_directories(sentinel PRIVATE
@@ -48,9 +49,10 @@ target_include_directories(sentinel PRIVATE
 target_link_libraries(sentinel PRIVATE
     ${OpenCV_LIBS}
     ${ONNXRUNTIME_LIB}
-    winhttp
 )
 
 if(MSVC)
     target_compile_options(sentinel PRIVATE /W4 /EHsc)
+else()
+    target_compile_options(sentinel PRIVATE -Wall -Wextra)
 endif()

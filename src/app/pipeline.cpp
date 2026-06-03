@@ -3,7 +3,6 @@
 #include "capture/video_source.h"
 #include "detection/yolo_onnx.h"
 #include "events/event_engine.h"
-#include "reasoning/llm_client.h"
 #include "reasoning/scene_state.h"
 #include "recording/frame_ring_buffer.h"
 #include "tracking/tracker.h"
@@ -14,13 +13,13 @@
 #include <opencv2/opencv.hpp>
 
 #include <chrono>
-#include <future>
+#include <cstddef>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <vector>
 #include <thread>
+#include <vector>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -43,11 +42,6 @@ bool isImportantForUi(const std::string& event) {
     return event.find("loitering") != std::string::npos ||
            event.find("exited") != std::string::npos ||
            event.find("entered scene") != std::string::npos;
-}
-
-bool isImportantForLlm(const std::string& event) {
-    return event.find("loitering") != std::string::npos ||
-           event.find("exited scene") != std::string::npos;
 }
 
 }  // namespace
@@ -82,7 +76,6 @@ void Pipeline::run() {
     EventEngine event_engine;
     ZoneManager zone_manager;
     SceneStateBuilder scene_state_builder;
-    LlmClient llm_client;
     OverlayRenderer overlay_renderer;
 
     cv::Mat frame;
@@ -93,16 +86,10 @@ void Pipeline::run() {
     bool zones_initialized = false;
 
     double last_scene_print_time_sec = -1000.0;
-    double last_llm_call_time_sec = -1000.0;
     double last_clip_save_time_sec = -1000.0;
 
-    std::string last_llm_event_signature;
-
-    std::string llm_summary = "Waiting for scene update...";
+    std::string llm_summary = "Pi vision mode: LLM disabled.";
     std::string llm_risk = "low";
-
-    std::future<LlmResult> llm_future;
-    bool llm_request_in_flight = false;
 
     std::vector<Detection> tracked_detections;
     std::vector<Detection> person_detections;
@@ -137,6 +124,9 @@ void Pipeline::run() {
         }
 
         frame_count++;
+
+        // For Pi, keep this at every 2nd frame first.
+        // If Pi struggles, change 2 to 3 or 4.
         const bool run_inference_this_frame = (frame_count % 2 == 0);
 
         if (run_inference_this_frame) {
@@ -144,8 +134,7 @@ void Pipeline::run() {
             processing_timer.start();
 
             bool should_save_event_clip = false;
-            bool important_event_for_llm = false;
-            std::string current_llm_event_signature;
+            bool loitering_detected = false;
 
             DetectionResult detection_result = detector.detect(frame);
             tracked_detections = tracker.update(detection_result.detections);
@@ -161,11 +150,6 @@ void Pipeline::run() {
                 if (isImportantForUi(event)) {
                     recent_events.push_back(event);
                 }
-
-                if (isImportantForLlm(event)) {
-                    important_event_for_llm = true;
-                    current_llm_event_signature = event;
-                }
             }
 
             std::vector<ZoneEvent> zone_events =
@@ -176,8 +160,7 @@ void Pipeline::run() {
 
                 if (zone_event.message.find("loitering") != std::string::npos) {
                     should_save_event_clip = true;
-                    important_event_for_llm = true;
-                    current_llm_event_signature = zone_event.message;
+                    loitering_detected = true;
                     recent_events.push_back(zone_event.message);
                 } else if (zone_event.message.find("exited") != std::string::npos) {
                     recent_events.push_back(zone_event.message);
@@ -219,6 +202,17 @@ void Pipeline::run() {
                 }
             }
 
+            if (person_detections.empty()) {
+                llm_summary = "No active person detected.";
+                llm_risk = "low";
+            } else if (loitering_detected) {
+                llm_summary = "Loitering detected in monitored zone.";
+                llm_risk = "medium";
+            } else {
+                llm_summary = "Person detected. Monitoring active.";
+                llm_risk = "low";
+            }
+
             SceneState scene_state = scene_state_builder.build(
                 current_time_sec,
                 person_detections,
@@ -228,67 +222,9 @@ void Pipeline::run() {
 
             const std::string scene_json = scene_state_builder.toJson(scene_state);
 
-            if ((current_time_sec - last_scene_print_time_sec) >= 3.0) {
+            if ((current_time_sec - last_scene_print_time_sec) >= 5.0) {
                 std::cout << "[SceneState]\n" << scene_json << "\n";
                 last_scene_print_time_sec = current_time_sec;
-            }
-
-            if (person_detections.empty() && !llm_request_in_flight) {
-                llm_summary = "No active person detected.";
-                llm_risk = "low";
-            }
-
-            const bool has_person = !person_detections.empty();
-            const bool initial_scene_update =
-                has_person &&
-                llm_summary == "Waiting for scene update..." &&
-                current_time_sec >= 3.0;
-
-            const bool should_call_llm =
-                !llm_request_in_flight &&
-                ((important_event_for_llm &&
-                  !current_llm_event_signature.empty() &&
-                  current_llm_event_signature != last_llm_event_signature &&
-                  (current_time_sec - last_llm_call_time_sec) >= 10.0) ||
-                 initial_scene_update);
-
-            if (should_call_llm) {
-                std::cout << "[Sentinel] Dispatching async LLM request...\n";
-
-                const std::string scene_json_copy = scene_json;
-
-                llm_future = std::async(
-                    std::launch::async,
-                    [&llm_client, scene_json_copy]() {
-                        return llm_client.reasonOverScene(scene_json_copy);
-                    });
-
-                llm_request_in_flight = true;
-                last_llm_call_time_sec = current_time_sec;
-
-                if (!current_llm_event_signature.empty()) {
-                    last_llm_event_signature = current_llm_event_signature;
-                }
-            }
-
-            if (llm_request_in_flight &&
-                llm_future.valid() &&
-                llm_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-                LlmResult llm_result = llm_future.get();
-
-                if (llm_result.success) {
-                    std::cout << "[LLM]\n";
-                    std::cout << "Summary: " << llm_result.summary << "\n";
-                    std::cout << "Risk: " << llm_result.risk_level << "\n";
-                    std::cout << "Action: " << llm_result.recommended_action << "\n";
-
-                    llm_summary = llm_result.summary;
-                    llm_risk = llm_result.risk_level;
-                } else {
-                    std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
-                }
-
-                llm_request_in_flight = false;
             }
 
             const double processing_time_ms = processing_timer.elapsedMilliseconds();
@@ -301,26 +237,6 @@ void Pipeline::run() {
                 } else {
                     pipeline_fps = 0.9 * pipeline_fps + 0.1 * instant_pipeline_fps;
                 }
-            }
-        } else {
-            if (llm_request_in_flight &&
-                llm_future.valid() &&
-                llm_future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-                LlmResult llm_result = llm_future.get();
-
-                if (llm_result.success) {
-                    std::cout << "[LLM]\n";
-                    std::cout << "Summary: " << llm_result.summary << "\n";
-                    std::cout << "Risk: " << llm_result.risk_level << "\n";
-                    std::cout << "Action: " << llm_result.recommended_action << "\n";
-
-                    llm_summary = llm_result.summary;
-                    llm_risk = llm_result.risk_level;
-                } else {
-                    std::cerr << "[LLM] Error: " << llm_result.error_message << "\n";
-                }
-
-                llm_request_in_flight = false;
             }
         }
 
