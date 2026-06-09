@@ -16,6 +16,7 @@ public:
     bool open();
     bool read(cv::Mat& frame);
     bool isOpened() const;
+    bool hasEnded() const;
 
     double fps() const;
     int width() const;
@@ -23,6 +24,7 @@ public:
 
 private:
     bool isWebcamSource() const;
+    int webcamIndex() const;
     bool isRtspSource() const;
     bool openInternal();
     void captureLoop();
@@ -37,6 +39,7 @@ private:
 
     std::atomic<bool> running_{false};
     std::atomic<bool> frame_ready_{false};
+    std::atomic<bool> end_of_stream_{false};
 
     std::uint64_t latest_frame_id_{0};
     std::uint64_t delivered_frame_id_{0};

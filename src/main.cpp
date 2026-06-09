@@ -5,11 +5,10 @@
 
 int main(int argc, char** argv) {
     std::cout << "[Sentinel] main() started." << std::endl;
+    std::cout << "[Sentinel] Build variant: " << SENTINEL_VARIANT << std::endl;
 
-    // Default source:
-    // Replace CAMERA_USER, CAMERA_PASSWORD, and CAMERA_IP with your actual values.
-    std::string source =
-        "rtsp://kunmunTapoCam:LeezaSonali_07@192.168.1.225:554/stream2";
+    // Use the default webcam unless a file path or RTSP URL is provided.
+    std::string source = "0";
 
     // Command-line override
     if (argc > 1) {

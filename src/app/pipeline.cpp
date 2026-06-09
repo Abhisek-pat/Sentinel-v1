@@ -57,18 +57,18 @@ bool Pipeline::initialize() {
 void Pipeline::run() {
     std::cout << "[Sentinel] Entering run().\n";
 
+    VideoSource video_source(source_);
+
+    if (!video_source.open()) {
+        std::cerr << "[Sentinel] Could not open video source.\n";
+        return;
+    }
+
     const std::string model_path = "models/yolo/model_320.onnx";
     YoloOnnxDetector detector(model_path);
 
     if (!detector.initialize()) {
         std::cerr << "[Sentinel] Failed to initialize detector.\n";
-        return;
-    }
-
-    VideoSource video_source(source_);
-
-    if (!video_source.open()) {
-        std::cerr << "[Sentinel] Could not open video source.\n";
         return;
     }
 
@@ -88,7 +88,7 @@ void Pipeline::run() {
     double last_scene_print_time_sec = -1000.0;
     double last_clip_save_time_sec = -1000.0;
 
-    std::string llm_summary = "Pi vision mode: LLM disabled.";
+    std::string llm_summary = "Local vision mode: LLM disabled.";
     std::string llm_risk = "low";
 
     std::vector<Detection> tracked_detections;
@@ -112,6 +112,11 @@ void Pipeline::run() {
 
     while (true) {
         if (!video_source.read(frame)) {
+            if (video_source.hasEnded()) {
+                std::cout << "[Sentinel] End of video file reached.\n";
+                break;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
             continue;
         }
@@ -125,9 +130,8 @@ void Pipeline::run() {
 
         frame_count++;
 
-        // For Pi, keep this at every 2nd frame first.
-        // If Pi struggles, change 2 to 3 or 4.
-        const bool run_inference_this_frame = (frame_count % 3 == 0);
+        const bool run_inference_this_frame =
+            (frame_count % SENTINEL_INFERENCE_INTERVAL == 0);
 
         if (run_inference_this_frame) {
             Timer processing_timer;
