@@ -4,6 +4,24 @@
 #include <iostream>
 #include <string>
 
+namespace {
+
+std::string sourceForLog(const std::string& source) {
+    if (source.rfind("rtsp://", 0) != 0) {
+        return source;
+    }
+
+    const std::size_t authority_start = source.find("://") + 3;
+    const std::size_t at = source.find('@', authority_start);
+    if (at == std::string::npos) {
+        return source;
+    }
+
+    return source.substr(0, authority_start) + "***@" + source.substr(at + 1);
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
     // Keep service logs visible immediately when stdout is connected to journald.
     std::cout << std::unitbuf;
@@ -20,7 +38,7 @@ int main(int argc, char** argv) {
         source = argv[1];
     }
 
-    std::cout << "[Sentinel] Source argument: " << source << std::endl;
+    std::cout << "[Sentinel] Source argument: " << sourceForLog(source) << std::endl;
 
     Pipeline pipeline(source);
 

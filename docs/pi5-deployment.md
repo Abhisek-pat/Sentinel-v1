@@ -16,6 +16,8 @@ Recommended baseline:
 - Two ONNX Runtime inference threads and inference every third frame.
 - Headless operation under `systemd`.
 - Thirty-frame event buffer, with clips stored under `/var/lib/sentinel/clips`.
+- A maximum of 100 retained event clips to prevent unbounded disk usage.
+- Performance telemetry written to the service journal every 30 seconds.
 
 This profile leaves substantial room inside 4 GB. The largest controllable
 memory cost is the uncompressed clip ring buffer: 30 BGR frames at 1280x720
@@ -58,6 +60,16 @@ watch -n 2 vcgencmd measure_temp
 watch -n 2 vcgencmd get_throttled
 ```
 
+Telemetry lines provide the primary baseline:
+
+```text
+[Telemetry] capture_fps=15.01 detection_fps=5.00 preprocess_ms=... inference_ms=... postprocess_ms=... persons=...
+```
+
+For the configured interval of three, `detection_fps` should be approximately
+one third of `capture_fps`. Investigate sustained capture-rate drops, rising
+inference latency, thermal throttling, or repeated RTSP read failures.
+
 Tune only one variable at a time:
 
 1. Start with `SENTINEL_INFERENCE_INTERVAL=3`.
@@ -65,6 +77,7 @@ Tune only one variable at a time:
 3. Try `4` if sustained load or temperature is too high.
 4. Reduce the camera stream to 640x360 or 10 FPS before reducing model input.
 5. Reduce `SENTINEL_CLIP_BUFFER_FRAMES` if memory or clip-write latency matters.
+6. Adjust `SENTINEL_MAX_CLIPS` to match available storage and retention needs.
 
 Avoid swap-dependent operation. If Sentinel approaches the 4 GB limit, reduce
 stream resolution and clip buffering instead of increasing swap.

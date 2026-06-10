@@ -12,6 +12,7 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
@@ -56,6 +57,59 @@ bool isImportantForUi(const std::string& event) {
            event.find("entered scene") != std::string::npos;
 }
 
+void enforceClipRetention(const std::filesystem::path& clip_dir, int max_clips) {
+    if (max_clips <= 0) {
+        return;
+    }
+
+    std::error_code error;
+    std::vector<std::filesystem::directory_entry> clips;
+
+    for (std::filesystem::directory_iterator it(clip_dir, error), end;
+         !error && it != end;
+         it.increment(error)) {
+        if (it->is_regular_file(error) && it->path().extension() == ".avi") {
+            clips.push_back(*it);
+        }
+    }
+
+    if (error) {
+        std::cerr << "[Sentinel] Could not inspect clip directory: "
+                  << error.message() << "\n";
+        return;
+    }
+
+    std::sort(
+        clips.begin(),
+        clips.end(),
+        [](const auto& left, const auto& right) {
+            std::error_code left_error;
+            std::error_code right_error;
+            const auto left_time = left.last_write_time(left_error);
+            const auto right_time = right.last_write_time(right_error);
+            if (left_error || right_error) {
+                return left.path().string() < right.path().string();
+            }
+            return left_time < right_time;
+        });
+
+    const std::size_t keep_count = static_cast<std::size_t>(max_clips);
+    const std::size_t remove_count =
+        clips.size() > keep_count ? clips.size() - keep_count : 0;
+
+    for (std::size_t i = 0; i < remove_count; ++i) {
+        std::filesystem::remove(clips[i].path(), error);
+        if (error) {
+            std::cerr << "[Sentinel] Could not remove old clip "
+                      << clips[i].path().string() << ": " << error.message() << "\n";
+            error.clear();
+        } else {
+            std::cout << "[Sentinel] Removed old clip: "
+                      << clips[i].path().string() << "\n";
+        }
+    }
+}
+
 }  // namespace
 
 Pipeline::Pipeline(const std::string& source)
@@ -85,10 +139,17 @@ bool Pipeline::run() {
         environmentInt("SENTINEL_INFERENCE_INTERVAL", SENTINEL_INFERENCE_INTERVAL, 1);
     const int clip_buffer_frames =
         environmentInt("SENTINEL_CLIP_BUFFER_FRAMES", 60, 0);
+    const int max_clips =
+        environmentInt("SENTINEL_MAX_CLIPS", 100, 0);
+    const int telemetry_interval_sec =
+        environmentInt("SENTINEL_TELEMETRY_INTERVAL_SEC", 30, 1);
 
     std::cout << "[Sentinel] Headless mode: " << (headless ? "enabled" : "disabled") << "\n";
     std::cout << "[Sentinel] Inference interval: every " << inference_interval << " frame(s)\n";
     std::cout << "[Sentinel] Clip buffer: " << clip_buffer_frames << " frame(s)\n";
+    std::cout << "[Sentinel] Clip retention: "
+              << (max_clips > 0 ? std::to_string(max_clips) : "unlimited") << "\n";
+    std::cout << "[Sentinel] Telemetry interval: " << telemetry_interval_sec << " second(s)\n";
 
     YoloOnnxDetector detector(model_path);
 
@@ -130,6 +191,7 @@ bool Pipeline::run() {
         std::cerr << "[Sentinel] Could not create clip directory " << clip_dir
                   << ": " << directory_error.message() << "\n";
     }
+    enforceClipRetention(clip_dir, max_clips);
 
     FrameRingBuffer clip_buffer(static_cast<std::size_t>(clip_buffer_frames));
     int clip_id = 0;
@@ -138,6 +200,13 @@ bool Pipeline::run() {
 
     Timer app_timer;
     app_timer.start();
+
+    double telemetry_window_start_sec = 0.0;
+    std::size_t telemetry_frames = 0;
+    std::size_t telemetry_inferences = 0;
+    double telemetry_preprocess_ms = 0.0;
+    double telemetry_inference_ms = 0.0;
+    double telemetry_postprocess_ms = 0.0;
 
     while (true) {
         if (!video_source.read(frame)) {
@@ -158,6 +227,7 @@ bool Pipeline::run() {
         }
 
         frame_count++;
+        telemetry_frames++;
 
         const bool run_inference_this_frame =
             (frame_count % inference_interval == 0);
@@ -170,6 +240,10 @@ bool Pipeline::run() {
             bool loitering_detected = false;
 
             DetectionResult detection_result = detector.detect(frame);
+            telemetry_inferences++;
+            telemetry_preprocess_ms += detection_result.preprocess_ms;
+            telemetry_inference_ms += detection_result.inference_ms;
+            telemetry_postprocess_ms += detection_result.postprocess_ms;
             tracked_detections = tracker.update(detection_result.detections);
 
             const double current_time_sec = app_timer.elapsedMilliseconds() / 1000.0;
@@ -211,6 +285,7 @@ bool Pipeline::run() {
                 if (clip_buffer.saveToVideo(output_path.string(), 10.0)) {
                     std::cout << "[Sentinel] Event clip saved: "
                               << output_path.string() << "\n";
+                    enforceClipRetention(clip_dir, max_clips);
                 }
 
                 last_clip_save_time_sec = current_time_sec;
@@ -271,6 +346,35 @@ bool Pipeline::run() {
                     pipeline_fps = 0.9 * pipeline_fps + 0.1 * instant_pipeline_fps;
                 }
             }
+        }
+
+        const double telemetry_now_sec = app_timer.elapsedMilliseconds() / 1000.0;
+        const double telemetry_elapsed_sec = telemetry_now_sec - telemetry_window_start_sec;
+        if (telemetry_elapsed_sec >= static_cast<double>(telemetry_interval_sec)) {
+            const double capture_fps =
+                static_cast<double>(telemetry_frames) / telemetry_elapsed_sec;
+            const double detection_fps =
+                static_cast<double>(telemetry_inferences) / telemetry_elapsed_sec;
+            const double inference_count = static_cast<double>(telemetry_inferences);
+
+            std::cout << std::fixed << std::setprecision(2)
+                      << "[Telemetry] capture_fps=" << capture_fps
+                      << " detection_fps=" << detection_fps
+                      << " preprocess_ms="
+                      << (telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0)
+                      << " inference_ms="
+                      << (telemetry_inferences > 0 ? telemetry_inference_ms / inference_count : 0.0)
+                      << " postprocess_ms="
+                      << (telemetry_inferences > 0 ? telemetry_postprocess_ms / inference_count : 0.0)
+                      << " persons=" << person_detections.size()
+                      << "\n";
+
+            telemetry_window_start_sec = telemetry_now_sec;
+            telemetry_frames = 0;
+            telemetry_inferences = 0;
+            telemetry_preprocess_ms = 0.0;
+            telemetry_inference_ms = 0.0;
+            telemetry_postprocess_ms = 0.0;
         }
 
         if (!headless) {
