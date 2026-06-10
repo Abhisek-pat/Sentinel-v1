@@ -1,5 +1,6 @@
 #include "app/pipeline.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -7,8 +8,8 @@ int main(int argc, char** argv) {
     std::cout << "[Sentinel] main() started." << std::endl;
     std::cout << "[Sentinel] Build variant: " << SENTINEL_VARIANT << std::endl;
 
-    // Use the default webcam unless a file path or RTSP URL is provided.
-    std::string source = "0";
+    const char* configured_source = std::getenv("SENTINEL_SOURCE");
+    std::string source = configured_source != nullptr ? configured_source : "0";
 
     // Command-line override
     if (argc > 1) {

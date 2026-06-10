@@ -104,6 +104,9 @@ Run with an RTSP stream:
 ./build/sentinel "rtsp://username:password@camera-ip:554/stream"
 ```
 
+For a Raspberry Pi 5 4 GB headless installation managed by `systemd`, see
+[`docs/pi5-deployment.md`](docs/pi5-deployment.md).
+
 ## Other Video Sources
 
 A video-file path can be passed instead of a webcam index or RTSP URL:

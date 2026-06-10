@@ -14,6 +14,8 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -21,21 +23,31 @@
 #include <thread>
 #include <vector>
 
-#ifdef _WIN32
-#include <direct.h>
-#else
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
-
 namespace {
 
-void ensureDirectoryExists(const char* path) {
-#ifdef _WIN32
-    _mkdir(path);
-#else
-    mkdir(path, 0755);
-#endif
+std::string environmentString(const char* name, const std::string& fallback) {
+    const char* value = std::getenv(name);
+    return value != nullptr && value[0] != '\0' ? value : fallback;
+}
+
+int environmentInt(const char* name, int fallback, int minimum) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        return fallback;
+    }
+
+    try {
+        return std::max(minimum, std::stoi(value));
+    } catch (const std::exception&) {
+        std::cerr << "[Sentinel] Ignoring invalid " << name << ": " << value << "\n";
+        return fallback;
+    }
+}
+
+bool environmentFlag(const char* name, bool fallback) {
+    const std::string value = environmentString(name, fallback ? "1" : "0");
+    return value == "1" || value == "true" || value == "TRUE" ||
+           value == "yes" || value == "YES";
 }
 
 bool isImportantForUi(const std::string& event) {
@@ -64,7 +76,20 @@ void Pipeline::run() {
         return;
     }
 
-    const std::string model_path = "models/yolo/model_320.onnx";
+    const std::string model_path =
+        environmentString("SENTINEL_MODEL_PATH", "models/yolo/model_320.onnx");
+    const std::string clip_dir =
+        environmentString("SENTINEL_CLIP_DIR", "data/clips");
+    const bool headless = environmentFlag("SENTINEL_HEADLESS", false);
+    const int inference_interval =
+        environmentInt("SENTINEL_INFERENCE_INTERVAL", SENTINEL_INFERENCE_INTERVAL, 1);
+    const int clip_buffer_frames =
+        environmentInt("SENTINEL_CLIP_BUFFER_FRAMES", 60, 0);
+
+    std::cout << "[Sentinel] Headless mode: " << (headless ? "enabled" : "disabled") << "\n";
+    std::cout << "[Sentinel] Inference interval: every " << inference_interval << " frame(s)\n";
+    std::cout << "[Sentinel] Clip buffer: " << clip_buffer_frames << " frame(s)\n";
+
     YoloOnnxDetector detector(model_path);
 
     if (!detector.initialize()) {
@@ -99,10 +124,14 @@ void Pipeline::run() {
     double pipeline_fps = 0.0;
     double displayed_frame_time_ms = 0.0;
 
-    ensureDirectoryExists("data");
-    ensureDirectoryExists("data/clips");
+    std::error_code directory_error;
+    std::filesystem::create_directories(clip_dir, directory_error);
+    if (directory_error) {
+        std::cerr << "[Sentinel] Could not create clip directory " << clip_dir
+                  << ": " << directory_error.message() << "\n";
+    }
 
-    FrameRingBuffer clip_buffer(60);
+    FrameRingBuffer clip_buffer(static_cast<std::size_t>(clip_buffer_frames));
     int clip_id = 0;
 
     std::cout << "[Sentinel] Starting frame loop.\n";
@@ -131,7 +160,7 @@ void Pipeline::run() {
         frame_count++;
 
         const bool run_inference_this_frame =
-            (frame_count % SENTINEL_INFERENCE_INTERVAL == 0);
+            (frame_count % inference_interval == 0);
 
         if (run_inference_this_frame) {
             Timer processing_timer;
@@ -174,14 +203,14 @@ void Pipeline::run() {
             if (should_save_event_clip &&
                 (current_time_sec - last_clip_save_time_sec) >= 10.0) {
                 std::ostringstream clip_path;
-                clip_path << "data/clips/event_"
-                          << std::setw(4) << std::setfill('0') << clip_id++
-                          << "_t" << static_cast<int>(current_time_sec)
-                          << ".avi";
+                clip_path << "event_" << std::setw(4) << std::setfill('0') << clip_id++
+                          << "_t" << static_cast<int>(current_time_sec) << ".avi";
+                const std::filesystem::path output_path =
+                    std::filesystem::path(clip_dir) / clip_path.str();
 
-                if (clip_buffer.saveToVideo(clip_path.str(), 10.0)) {
+                if (clip_buffer.saveToVideo(output_path.string(), 10.0)) {
                     std::cout << "[Sentinel] Event clip saved: "
-                              << clip_path.str() << "\n";
+                              << output_path.string() << "\n";
                 }
 
                 last_clip_save_time_sec = current_time_sec;
@@ -244,21 +273,25 @@ void Pipeline::run() {
             }
         }
 
-        zone_manager.drawZones(frame);
-        overlay_renderer.drawDetections(frame, person_detections);
-        overlay_renderer.drawStats(frame, pipeline_fps, displayed_frame_time_ms, source_label);
-        overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
-        overlay_renderer.drawEvents(frame, recent_events);
+        if (!headless) {
+            zone_manager.drawZones(frame);
+            overlay_renderer.drawDetections(frame, person_detections);
+            overlay_renderer.drawStats(frame, pipeline_fps, displayed_frame_time_ms, source_label);
+            overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
+            overlay_renderer.drawEvents(frame, recent_events);
 
-        cv::imshow(window_name, frame);
+            cv::imshow(window_name, frame);
 
-        const int key = cv::waitKey(1);
-        if (key == 'q' || key == 'Q' || key == 27) {
-            std::cout << "[Sentinel] Exit requested by user.\n";
-            break;
+            const int key = cv::waitKey(1);
+            if (key == 'q' || key == 'Q' || key == 27) {
+                std::cout << "[Sentinel] Exit requested by user.\n";
+                break;
+            }
         }
     }
 
-    cv::destroyAllWindows();
+    if (!headless) {
+        cv::destroyAllWindows();
+    }
     std::cout << "[Sentinel] Exiting run().\n";
 }

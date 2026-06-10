@@ -114,8 +114,12 @@ endif()
 
 if(MSVC)
     target_compile_options(sentinel PRIVATE /W4 /EHsc)
+    target_compile_definitions(sentinel PRIVATE _CRT_SECURE_NO_WARNINGS)
 else()
-    target_compile_options(sentinel PRIVATE -Wall -Wextra)
+    target_compile_options(sentinel PRIVATE -Wall -Wextra -O3)
     find_package(Threads REQUIRED)
     target_link_libraries(sentinel PRIVATE Threads::Threads)
 endif()
+
+install(TARGETS sentinel RUNTIME DESTINATION bin)
+install(FILES models/yolo/model_320.onnx DESTINATION share/sentinel/models/yolo)
