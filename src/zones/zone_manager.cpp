@@ -1,5 +1,6 @@
 #include "zones/zone_manager.h"
 
+#include <iomanip>
 #include <sstream>
 
 ZoneManager::ZoneManager() = default;
@@ -71,17 +72,30 @@ std::vector<ZoneEvent> ZoneManager::update(const std::vector<Detection>& detecti
                     }
                 }
             } else {
-                if (it != zone_map.end() && it->second.inside) {
-                    const double dwell = current_time_sec - it->second.enter_time;
+                // Keep the state briefly so boundary jitter does not emit
+                // repeated exit and entry events.
+            }
+        }
+    }
 
-                    std::ostringstream oss;
-                    oss << "[Zone] Track " << det.track_id
-                        << " exited " << zone.name
-                        << " after " << dwell << "s";
-                    events.push_back({oss.str()});
+    for (const auto& zone : zones_) {
+        auto& zone_map = zone_states_[zone.name];
 
-                    zone_map.erase(it);
-                }
+        for (auto it = zone_map.begin(); it != zone_map.end();) {
+            const double time_since_inside = current_time_sec - it->second.last_seen_time;
+            if (it->second.inside && time_since_inside >= exit_timeout_sec_) {
+                const double dwell = it->second.last_seen_time - it->second.enter_time;
+
+                std::ostringstream oss;
+                oss << "[Zone] Track " << it->first
+                    << " exited " << zone.name
+                    << " after " << std::fixed << std::setprecision(1)
+                    << dwell << "s";
+                events.push_back({oss.str()});
+
+                it = zone_map.erase(it);
+            } else {
+                ++it;
             }
         }
     }

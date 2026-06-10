@@ -39,7 +39,6 @@ std::vector<std::string> EventEngine::update(std::vector<Detection>& detections,
             state.last_seen_sec = current_time_sec;
             state.currently_visible = true;
             state.class_name = detection.class_name;
-            state.exit_emitted = false;
 
             detection.dwell_time_sec = current_time_sec - state.first_seen_sec;
 

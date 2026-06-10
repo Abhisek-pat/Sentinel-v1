@@ -24,38 +24,62 @@ float Tracker::computeIoU(const cv::Rect& a, const cv::Rect& b) {
 }
 
 std::vector<Detection> Tracker::update(const std::vector<Detection>& detections) {
-    std::vector<bool> detection_used(detections.size(), false);
+    struct MatchCandidate {
+        std::size_t track_index{0};
+        std::size_t detection_index{0};
+        float iou{0.0f};
+    };
 
-    for (auto& track : tracks_) {
-        float best_iou = 0.0f;
-        int best_detection_index = -1;
+    std::vector<MatchCandidate> candidates;
+    candidates.reserve(tracks_.size() * detections.size());
 
-        for (std::size_t i = 0; i < detections.size(); ++i) {
-            if (detection_used[i]) {
+    for (std::size_t track_index = 0; track_index < tracks_.size(); ++track_index) {
+        for (std::size_t detection_index = 0;
+             detection_index < detections.size();
+             ++detection_index) {
+            if (tracks_[track_index].class_id != detections[detection_index].class_id) {
                 continue;
             }
 
-            if (track.class_id != detections[i].class_id) {
-                continue;
-            }
-
-            const float iou = computeIoU(track.box, detections[i].box);
-            if (iou > best_iou) {
-                best_iou = iou;
-                best_detection_index = static_cast<int>(i);
+            const float iou =
+                computeIoU(tracks_[track_index].box, detections[detection_index].box);
+            if (iou >= iou_threshold_) {
+                candidates.push_back({track_index, detection_index, iou});
             }
         }
+    }
 
-        if (best_detection_index >= 0 && best_iou >= iou_threshold_) {
-            const auto& det = detections[best_detection_index];
-            track.box = det.box;
-            track.confidence = det.confidence;
-            track.class_id = det.class_id;
-            track.class_name = det.class_name;
-            track.missing_frames = 0;
-            detection_used[best_detection_index] = true;
-        } else {
-            track.missing_frames++;
+    std::sort(
+        candidates.begin(),
+        candidates.end(),
+        [](const MatchCandidate& left, const MatchCandidate& right) {
+            return left.iou > right.iou;
+        });
+
+    std::vector<bool> track_used(tracks_.size(), false);
+    std::vector<bool> detection_used(detections.size(), false);
+
+    for (const auto& candidate : candidates) {
+        if (track_used[candidate.track_index] ||
+            detection_used[candidate.detection_index]) {
+            continue;
+        }
+
+        auto& track = tracks_[candidate.track_index];
+        const auto& detection = detections[candidate.detection_index];
+        track.box = detection.box;
+        track.confidence = detection.confidence;
+        track.class_id = detection.class_id;
+        track.class_name = detection.class_name;
+        track.missing_frames = 0;
+
+        track_used[candidate.track_index] = true;
+        detection_used[candidate.detection_index] = true;
+    }
+
+    for (std::size_t track_index = 0; track_index < tracks_.size(); ++track_index) {
+        if (!track_used[track_index]) {
+            tracks_[track_index].missing_frames++;
         }
     }
 

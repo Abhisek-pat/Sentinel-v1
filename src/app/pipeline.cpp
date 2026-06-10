@@ -143,6 +143,8 @@ bool Pipeline::run() {
         environmentInt("SENTINEL_MAX_CLIPS", 100, 0);
     const int telemetry_interval_sec =
         environmentInt("SENTINEL_TELEMETRY_INTERVAL_SEC", 30, 1);
+    const int scene_interval_sec =
+        environmentInt("SENTINEL_SCENE_INTERVAL_SEC", 5, 1);
 
     std::cout << "[Sentinel] Headless mode: " << (headless ? "enabled" : "disabled") << "\n";
     std::cout << "[Sentinel] Inference interval: every " << inference_interval << " frame(s)\n";
@@ -150,6 +152,7 @@ bool Pipeline::run() {
     std::cout << "[Sentinel] Clip retention: "
               << (max_clips > 0 ? std::to_string(max_clips) : "unlimited") << "\n";
     std::cout << "[Sentinel] Telemetry interval: " << telemetry_interval_sec << " second(s)\n";
+    std::cout << "[Sentinel] SceneState interval: " << scene_interval_sec << " second(s)\n";
 
     YoloOnnxDetector detector(model_path);
 
@@ -330,7 +333,8 @@ bool Pipeline::run() {
 
             const std::string scene_json = scene_state_builder.toJson(scene_state);
 
-            if ((current_time_sec - last_scene_print_time_sec) >= 5.0) {
+            if ((current_time_sec - last_scene_print_time_sec) >=
+                static_cast<double>(scene_interval_sec)) {
                 std::cout << "[SceneState]\n" << scene_json << "\n";
                 last_scene_print_time_sec = current_time_sec;
             }

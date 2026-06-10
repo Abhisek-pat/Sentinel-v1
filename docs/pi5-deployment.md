@@ -18,6 +18,7 @@ Recommended baseline:
 - Thirty-frame event buffer, with clips stored under `/var/lib/sentinel/clips`.
 - A maximum of 100 retained event clips to prevent unbounded disk usage.
 - Performance telemetry written to the service journal every 30 seconds.
+- SceneState JSON limited to once every 30 seconds.
 
 This profile leaves substantial room inside 4 GB. The largest controllable
 memory cost is the uncompressed clip ring buffer: 30 BGR frames at 1280x720

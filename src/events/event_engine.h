@@ -33,7 +33,7 @@ private:
     double entry_min_duration_sec_{1.0};
 
     // Time after last seen before considering "exited"
-    double exit_timeout_sec_{1.5};
+    double exit_timeout_sec_{4.0};
 
     // Minimum dwell time required to emit exit event
     double min_exit_dwell_sec_{2.0};

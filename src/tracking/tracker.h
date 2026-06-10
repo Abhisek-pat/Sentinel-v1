@@ -28,5 +28,5 @@ private:
     std::vector<Track> tracks_;
     int next_track_id_{0};
     float iou_threshold_{0.10f};
-    int max_missing_frames_{45};
+    int max_missing_frames_{15};
 };

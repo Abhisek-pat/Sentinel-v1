@@ -44,6 +44,7 @@ private:
     std::vector<Zone> zones_;
     std::unordered_map<std::string, std::unordered_map<int, ZoneState>> zone_states_;
     double loiter_threshold_sec_{10.0};
+    double exit_timeout_sec_{1.5};
 
 private:
     bool isInside(const cv::Rect& box, const cv::Rect& zone) const;
