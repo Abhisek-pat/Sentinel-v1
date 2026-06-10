@@ -66,14 +66,14 @@ bool Pipeline::initialize() {
     return true;
 }
 
-void Pipeline::run() {
+bool Pipeline::run() {
     std::cout << "[Sentinel] Entering run().\n";
 
     VideoSource video_source(source_);
 
     if (!video_source.open()) {
         std::cerr << "[Sentinel] Could not open video source.\n";
-        return;
+        return false;
     }
 
     const std::string model_path =
@@ -94,7 +94,7 @@ void Pipeline::run() {
 
     if (!detector.initialize()) {
         std::cerr << "[Sentinel] Failed to initialize detector.\n";
-        return;
+        return false;
     }
 
     Tracker tracker;
@@ -294,4 +294,5 @@ void Pipeline::run() {
         cv::destroyAllWindows();
     }
     std::cout << "[Sentinel] Exiting run().\n";
+    return true;
 }

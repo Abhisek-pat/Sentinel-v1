@@ -5,6 +5,10 @@
 #include <string>
 
 int main(int argc, char** argv) {
+    // Keep service logs visible immediately when stdout is connected to journald.
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
+
     std::cout << "[Sentinel] main() started." << std::endl;
     std::cout << "[Sentinel] Build variant: " << SENTINEL_VARIANT << std::endl;
 
@@ -25,7 +29,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    pipeline.run();
+    if (!pipeline.run()) {
+        std::cerr << "[Sentinel] Pipeline stopped because of a startup failure." << std::endl;
+        return 1;
+    }
 
     std::cout << "[Sentinel] main() finished." << std::endl;
     return 0;

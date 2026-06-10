@@ -7,7 +7,7 @@ public:
     explicit Pipeline(const std::string& source);
 
     bool initialize();
-    void run();
+    bool run();
 
 private:
     std::string source_;
