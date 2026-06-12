@@ -19,7 +19,7 @@ DATABASE_PATH = Path(
 RETENTION_DAYS = max(1, int(os.environ.get("SENTINEL_KPI_RETENTION_DAYS", "7")))
 ALERT_CAPTURE_FPS_MIN = float(os.environ.get("SENTINEL_ALERT_CAPTURE_FPS_MIN", "12"))
 ALERT_CAPTURE_DELIVERY_PERCENT_MIN = float(
-    os.environ.get("SENTINEL_ALERT_CAPTURE_DELIVERY_PERCENT_MIN", "85")
+    os.environ.get("SENTINEL_ALERT_CAPTURE_DELIVERY_PERCENT_MIN", "70")
 )
 ALERT_INFERENCE_MS_MAX = float(os.environ.get("SENTINEL_ALERT_INFERENCE_MS_MAX", "100"))
 ALERT_TEMPERATURE_C_MAX = float(os.environ.get("SENTINEL_ALERT_TEMPERATURE_C_MAX", "75"))
@@ -343,7 +343,7 @@ def evaluate_alerts(
         add(
             "capture_delivery_low",
             "warning",
-            "Sentinel is dropping too many acquired frames before processing.",
+            "Fresh-frame delivery is persistently below the configured minimum.",
         )
     if latest.get("inference_ms", 0) > ALERT_INFERENCE_MS_MAX:
         add("inference_slow", "warning", "Inference latency is above the configured limit.")
@@ -450,9 +450,11 @@ def summary(
             SELECT
                 COUNT(*) AS samples,
                 COUNT(CASE WHEN source_fps > 0 THEN 1 END) AS diagnostic_samples,
+                COUNT(CASE WHEN capture_delivery_percent > 0 THEN 1 END)
+                    AS normalized_samples,
                 AVG(CASE WHEN source_fps > 0 THEN source_fps END) AS source_fps_avg,
                 AVG(capture_fps) AS capture_fps_avg,
-                AVG(CASE WHEN source_fps > 0 THEN capture_delivery_percent END)
+                AVG(CASE WHEN capture_delivery_percent > 0 THEN capture_delivery_percent END)
                     AS capture_delivery_percent_avg,
                 AVG(detection_fps) AS detection_fps_avg,
                 AVG(inference_ms) AS inference_ms_avg,
@@ -462,9 +464,9 @@ def summary(
                     AS capture_read_avg_ms,
                 MAX(CASE WHEN source_fps > 0 THEN capture_read_max_ms END)
                     AS capture_read_max_ms,
-                SUM(CASE WHEN source_fps > 0 THEN capture_slow_reads ELSE 0 END)
+                SUM(CASE WHEN capture_delivery_percent > 0 THEN capture_slow_reads ELSE 0 END)
                     AS capture_slow_reads,
-                AVG(CASE WHEN source_fps > 0 THEN capture_slow_read_percent END)
+                AVG(CASE WHEN capture_delivery_percent > 0 THEN capture_slow_read_percent END)
                     AS capture_slow_read_percent_avg
             FROM telemetry WHERE timestamp_ms >= ?
             """,

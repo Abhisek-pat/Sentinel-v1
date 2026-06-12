@@ -105,8 +105,10 @@ drops:
 - Healthy `source_fps` with low `capture_fps` indicates that frames are arriving
   normally but are not being delivered or processed quickly enough. Inspect
   CPU usage, clip writes, and inference interval.
-- `capture_delivery_percent` should normally remain above 85%. It compares
-  frames acquired from the camera with frames delivered to the processing loop.
+- `capture_delivery_percent` should normally remain above 70%. It compares
+  frames acquired from the camera with fresh frames delivered to the processing
+  loop. Sentinel intentionally overwrites stale RTSP frames, so values below
+  100% are expected when frame age remains low.
 - `capture_slow_read_percent` is more useful than the raw slow-read count when
   comparing telemetry windows of different lengths.
 - `capture_read_max_ms` reveals intermittent stalls even when average read
