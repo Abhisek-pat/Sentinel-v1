@@ -53,6 +53,7 @@ def initialize_database() -> None:
             """
             CREATE TABLE IF NOT EXISTS telemetry (
                 timestamp_ms INTEGER PRIMARY KEY,
+                source_fps REAL NOT NULL DEFAULT 0,
                 capture_fps REAL NOT NULL,
                 detection_fps REAL NOT NULL,
                 preprocess_ms REAL NOT NULL,
@@ -60,7 +61,10 @@ def initialize_database() -> None:
                 postprocess_ms REAL NOT NULL,
                 persons INTEGER NOT NULL,
                 rtsp_reconnects INTEGER NOT NULL,
-                last_frame_age_ms INTEGER NOT NULL
+                last_frame_age_ms INTEGER NOT NULL,
+                capture_read_avg_ms REAL NOT NULL DEFAULT 0,
+                capture_read_max_ms REAL NOT NULL DEFAULT 0,
+                capture_slow_reads INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS events (
@@ -77,6 +81,17 @@ def initialize_database() -> None:
             );
             """
         )
+        telemetry_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(telemetry)")
+        }
+        for name, definition in (
+            ("source_fps", "REAL NOT NULL DEFAULT 0"),
+            ("capture_read_avg_ms", "REAL NOT NULL DEFAULT 0"),
+            ("capture_read_max_ms", "REAL NOT NULL DEFAULT 0"),
+            ("capture_slow_reads", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            if name not in telemetry_columns:
+                connection.execute(f"ALTER TABLE telemetry ADD COLUMN {name} {definition}")
 
 
 def ingest_jsonl(path: Path, insert_sql: str, fields: tuple[str, ...]) -> int:
@@ -133,13 +148,15 @@ def ingest() -> dict[str, int]:
         KPI_DIR / "telemetry.jsonl",
         """
         INSERT OR IGNORE INTO telemetry (
-            timestamp_ms, capture_fps, detection_fps, preprocess_ms,
+            timestamp_ms, source_fps, capture_fps, detection_fps, preprocess_ms,
             inference_ms, postprocess_ms, persons, rtsp_reconnects,
-            last_frame_age_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            last_frame_age_ms, capture_read_avg_ms, capture_read_max_ms,
+            capture_slow_reads
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "timestamp_ms",
+            "source_fps",
             "capture_fps",
             "detection_fps",
             "preprocess_ms",
@@ -148,6 +165,9 @@ def ingest() -> dict[str, int]:
             "persons",
             "rtsp_reconnects",
             "last_frame_age_ms",
+            "capture_read_avg_ms",
+            "capture_read_max_ms",
+            "capture_slow_reads",
         ),
     )
     event_count = ingest_jsonl(
@@ -294,7 +314,19 @@ def evaluate_alerts(
     if latest.get("last_frame_age_ms", 0) > ALERT_TELEMETRY_AGE_SEC_MAX * 1000:
         add("stream_stale", "critical", "No fresh camera frame is available.")
     if latest.get("capture_fps", ALERT_CAPTURE_FPS_MIN) < ALERT_CAPTURE_FPS_MIN:
-        add("capture_fps_low", "warning", "Capture FPS is below the configured baseline.")
+        source_fps = latest.get("source_fps", latest.get("capture_fps", 0))
+        if source_fps < ALERT_CAPTURE_FPS_MIN or latest.get("capture_slow_reads", 0) > 0:
+            add(
+                "camera_throughput_low",
+                "warning",
+                "Camera acquisition is below baseline; inspect the camera or network.",
+            )
+        else:
+            add(
+                "capture_fps_low",
+                "warning",
+                "Capture FPS is low without camera read stalls; inspect processing load.",
+            )
     if latest.get("inference_ms", 0) > ALERT_INFERENCE_MS_MAX:
         add("inference_slow", "warning", "Inference latency is above the configured limit.")
     if device.get("temperature_c") is not None and device["temperature_c"] > ALERT_TEMPERATURE_C_MAX:
@@ -399,11 +431,15 @@ def summary(
             """
             SELECT
                 COUNT(*) AS samples,
+                AVG(source_fps) AS source_fps_avg,
                 AVG(capture_fps) AS capture_fps_avg,
                 AVG(detection_fps) AS detection_fps_avg,
                 AVG(inference_ms) AS inference_ms_avg,
                 MAX(rtsp_reconnects) AS rtsp_reconnects,
-                MAX(last_frame_age_ms) AS last_frame_age_ms_max
+                MAX(last_frame_age_ms) AS last_frame_age_ms_max,
+                AVG(capture_read_avg_ms) AS capture_read_avg_ms,
+                MAX(capture_read_max_ms) AS capture_read_max_ms,
+                SUM(capture_slow_reads) AS capture_slow_reads
             FROM telemetry WHERE timestamp_ms >= ?
             """,
             (cutoff_ms,),

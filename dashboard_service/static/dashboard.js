@@ -68,6 +68,10 @@ function update(data) {
   $("reconnects").textContent = latest.rtsp_reconnects ?? "--";
   $("throttled").textContent = device.throttled ?? "Unavailable";
   $("frame-age").textContent = latest.last_frame_age_ms == null ? "--" : `${latest.last_frame_age_ms} ms`;
+  $("source-fps").textContent = latest.source_fps == null ? "--" : `${number(latest.source_fps, 2)} FPS`;
+  $("read-average").textContent = latest.capture_read_avg_ms == null ? "--" : `${number(latest.capture_read_avg_ms, 1)} ms`;
+  $("read-maximum").textContent = latest.capture_read_max_ms == null ? "--" : `${number(latest.capture_read_max_ms, 1)} ms`;
+  $("slow-reads").textContent = latest.capture_slow_reads ?? "--";
   $("uptime").textContent = duration(device.uptime_sec);
   setMeter("memory-meter", "memory-label", device.memory_used_percent);
   setMeter("disk-meter", "disk-label", device.disk_used_percent);

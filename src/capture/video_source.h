@@ -8,6 +8,14 @@
 #include <string>
 #include <thread>
 
+struct CaptureDiagnostics {
+    std::uint64_t reads{0};
+    std::uint64_t successful_reads{0};
+    std::uint64_t slow_reads{0};
+    double average_read_ms{0.0};
+    double max_read_ms{0.0};
+};
+
 class VideoSource {
 public:
     explicit VideoSource(const std::string& source);
@@ -23,6 +31,7 @@ public:
     int height() const;
     std::uint64_t reconnectCount() const;
     std::int64_t lastFrameAgeMilliseconds() const;
+    CaptureDiagnostics takeDiagnostics();
 
 private:
     bool isWebcamSource() const;
@@ -31,6 +40,7 @@ private:
     bool openInternal();
     bool reconnectRtsp();
     void captureLoop();
+    void recordReadDuration(double duration_ms, bool successful);
 
 private:
     std::string source_;
@@ -39,6 +49,12 @@ private:
     std::thread capture_thread_;
     std::mutex frame_mutex_;
     cv::Mat latest_frame_;
+    std::mutex diagnostics_mutex_;
+    std::uint64_t diagnostic_reads_{0};
+    std::uint64_t diagnostic_successful_reads_{0};
+    std::uint64_t diagnostic_slow_reads_{0};
+    double diagnostic_total_read_ms_{0.0};
+    double diagnostic_max_read_ms_{0.0};
 
     std::atomic<bool> running_{false};
     std::atomic<bool> frame_ready_{false};

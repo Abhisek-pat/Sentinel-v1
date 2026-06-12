@@ -1,5 +1,6 @@
 #include "capture/video_source.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -155,8 +156,15 @@ bool VideoSource::open() {
 void VideoSource::captureLoop() {
     while (running_) {
         cv::Mat frame;
+        const auto read_start = std::chrono::steady_clock::now();
+        const bool read_ok = cap_.read(frame);
+        const double read_duration_ms =
+            std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - read_start)
+                .count();
+        recordReadDuration(read_duration_ms, read_ok && !frame.empty());
 
-        if (cap_.read(frame) && !frame.empty()) {
+        if (read_ok && !frame.empty()) {
             {
                 std::lock_guard<std::mutex> lock(frame_mutex_);
 
@@ -201,7 +209,13 @@ bool VideoSource::read(cv::Mat& frame) {
         return false;
     }
 
+    const auto read_start = std::chrono::steady_clock::now();
     const bool read_ok = cap_.read(frame) && !frame.empty();
+    const double read_duration_ms =
+        std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - read_start)
+            .count();
+    recordReadDuration(read_duration_ms, read_ok);
 
     if (!read_ok && !isWebcamSource()) {
         end_of_stream_ = true;
@@ -241,4 +255,38 @@ std::int64_t VideoSource::lastFrameAgeMilliseconds() const {
     }
 
     return steadyClockMilliseconds() - last_frame_time;
+}
+
+void VideoSource::recordReadDuration(double duration_ms, bool successful) {
+    std::lock_guard<std::mutex> lock(diagnostics_mutex_);
+    diagnostic_reads_++;
+    if (successful) {
+        diagnostic_successful_reads_++;
+    }
+    diagnostic_total_read_ms_ += duration_ms;
+    diagnostic_max_read_ms_ = std::max(diagnostic_max_read_ms_, duration_ms);
+    if (duration_ms >= 100.0) {
+        diagnostic_slow_reads_++;
+    }
+}
+
+CaptureDiagnostics VideoSource::takeDiagnostics() {
+    std::lock_guard<std::mutex> lock(diagnostics_mutex_);
+
+    CaptureDiagnostics diagnostics;
+    diagnostics.reads = diagnostic_reads_;
+    diagnostics.successful_reads = diagnostic_successful_reads_;
+    diagnostics.slow_reads = diagnostic_slow_reads_;
+    diagnostics.average_read_ms =
+        diagnostic_reads_ > 0
+            ? diagnostic_total_read_ms_ / static_cast<double>(diagnostic_reads_)
+            : 0.0;
+    diagnostics.max_read_ms = diagnostic_max_read_ms_;
+
+    diagnostic_reads_ = 0;
+    diagnostic_successful_reads_ = 0;
+    diagnostic_slow_reads_ = 0;
+    diagnostic_total_read_ms_ = 0.0;
+    diagnostic_max_read_ms_ = 0.0;
+    return diagnostics;
 }

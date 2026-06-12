@@ -6,6 +6,7 @@
 #include <string>
 
 struct TelemetryKpi {
+    double source_fps{0.0};
     double capture_fps{0.0};
     double detection_fps{0.0};
     double preprocess_ms{0.0};
@@ -14,6 +15,9 @@ struct TelemetryKpi {
     std::size_t persons{0};
     std::uint64_t rtsp_reconnects{0};
     std::int64_t last_frame_age_ms{-1};
+    double capture_read_avg_ms{0.0};
+    double capture_read_max_ms{0.0};
+    std::uint64_t capture_slow_reads{0};
 };
 
 class KpiWriter {

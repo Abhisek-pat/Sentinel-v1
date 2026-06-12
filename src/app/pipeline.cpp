@@ -369,9 +369,13 @@ bool Pipeline::run() {
             const double detection_fps =
                 static_cast<double>(telemetry_inferences) / telemetry_elapsed_sec;
             const double inference_count = static_cast<double>(telemetry_inferences);
+            const CaptureDiagnostics capture_diagnostics = video_source.takeDiagnostics();
+            const double source_fps =
+                static_cast<double>(capture_diagnostics.successful_reads) / telemetry_elapsed_sec;
 
             std::cout << std::fixed << std::setprecision(2)
-                      << "[Telemetry] capture_fps=" << capture_fps
+                      << "[Telemetry] source_fps=" << source_fps
+                      << " capture_fps=" << capture_fps
                       << " detection_fps=" << detection_fps
                       << " preprocess_ms="
                       << (telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0)
@@ -382,9 +386,13 @@ bool Pipeline::run() {
                       << " persons=" << person_detections.size()
                       << " rtsp_reconnects=" << video_source.reconnectCount()
                       << " last_frame_age_ms=" << video_source.lastFrameAgeMilliseconds()
+                      << " capture_read_avg_ms=" << capture_diagnostics.average_read_ms
+                      << " capture_read_max_ms=" << capture_diagnostics.max_read_ms
+                      << " capture_slow_reads=" << capture_diagnostics.slow_reads
                       << "\n";
 
             kpi_writer.writeTelemetry({
+                source_fps,
                 capture_fps,
                 detection_fps,
                 telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0,
@@ -392,7 +400,10 @@ bool Pipeline::run() {
                 telemetry_inferences > 0 ? telemetry_postprocess_ms / inference_count : 0.0,
                 person_detections.size(),
                 video_source.reconnectCount(),
-                video_source.lastFrameAgeMilliseconds()
+                video_source.lastFrameAgeMilliseconds(),
+                capture_diagnostics.average_read_ms,
+                capture_diagnostics.max_read_ms,
+                capture_diagnostics.slow_reads
             });
 
             telemetry_window_start_sec = telemetry_now_sec;

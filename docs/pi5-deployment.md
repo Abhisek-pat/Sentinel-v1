@@ -88,13 +88,25 @@ watch -n 2 vcgencmd get_throttled
 Telemetry lines provide the primary baseline:
 
 ```text
-[Telemetry] capture_fps=15.01 detection_fps=5.00 preprocess_ms=... inference_ms=... postprocess_ms=... persons=...
+[Telemetry] source_fps=15.01 capture_fps=15.01 detection_fps=5.00 inference_ms=... capture_read_avg_ms=... capture_read_max_ms=... capture_slow_reads=...
 ```
 
 For the configured interval of three, `detection_fps` should be approximately
 one third of `capture_fps`. Investigate sustained capture-rate drops, rising
 inference latency, thermal throttling, or repeated RTSP reconnects.
 `last_frame_age_ms` should normally remain well below 1000.
+
+Use source FPS and the camera-read metrics to classify sustained capture-rate
+drops:
+
+- Low `source_fps` or `capture_slow_reads > 0` indicates that camera or network
+  reads are limiting throughput. Check Wi-Fi signal, camera load, RTSP
+  substream FPS, and wired Ethernet before changing inference settings.
+- Healthy `source_fps` with low `capture_fps` indicates that frames are arriving
+  normally but are not being delivered or processed quickly enough. Inspect
+  CPU usage, clip writes, and inference interval.
+- `capture_read_max_ms` reveals intermittent stalls even when average read
+  latency appears healthy.
 
 Tune only one variable at a time:
 

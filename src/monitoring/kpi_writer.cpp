@@ -43,6 +43,7 @@ void KpiWriter::writeTelemetry(const TelemetryKpi& telemetry) {
 
     telemetry_stream_ << std::fixed << std::setprecision(2)
                       << "{\"timestamp_ms\":" << unixTimeMilliseconds()
+                      << ",\"source_fps\":" << telemetry.source_fps
                       << ",\"capture_fps\":" << telemetry.capture_fps
                       << ",\"detection_fps\":" << telemetry.detection_fps
                       << ",\"preprocess_ms\":" << telemetry.preprocess_ms
@@ -51,6 +52,9 @@ void KpiWriter::writeTelemetry(const TelemetryKpi& telemetry) {
                       << ",\"persons\":" << telemetry.persons
                       << ",\"rtsp_reconnects\":" << telemetry.rtsp_reconnects
                       << ",\"last_frame_age_ms\":" << telemetry.last_frame_age_ms
+                      << ",\"capture_read_avg_ms\":" << telemetry.capture_read_avg_ms
+                      << ",\"capture_read_max_ms\":" << telemetry.capture_read_max_ms
+                      << ",\"capture_slow_reads\":" << telemetry.capture_slow_reads
                       << "}\n";
     telemetry_stream_.flush();
 }
