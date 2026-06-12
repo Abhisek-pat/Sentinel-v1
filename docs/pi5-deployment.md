@@ -88,7 +88,7 @@ watch -n 2 vcgencmd get_throttled
 Telemetry lines provide the primary baseline:
 
 ```text
-[Telemetry] source_fps=15.01 capture_fps=15.01 detection_fps=5.00 inference_ms=... capture_read_avg_ms=... capture_read_max_ms=... capture_slow_reads=...
+[Telemetry] source_fps=15.01 capture_fps=15.01 capture_delivery_percent=99.9 detection_fps=5.00 inference_ms=... capture_read_avg_ms=... capture_read_max_ms=... capture_slow_read_percent=...
 ```
 
 For the configured interval of three, `detection_fps` should be approximately
@@ -105,6 +105,10 @@ drops:
 - Healthy `source_fps` with low `capture_fps` indicates that frames are arriving
   normally but are not being delivered or processed quickly enough. Inspect
   CPU usage, clip writes, and inference interval.
+- `capture_delivery_percent` should normally remain above 85%. It compares
+  frames acquired from the camera with frames delivered to the processing loop.
+- `capture_slow_read_percent` is more useful than the raw slow-read count when
+  comparing telemetry windows of different lengths.
 - `capture_read_max_ms` reveals intermittent stalls even when average read
   latency appears healthy.
 

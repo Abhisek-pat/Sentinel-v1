@@ -18,6 +18,9 @@ DATABASE_PATH = Path(
 )
 RETENTION_DAYS = max(1, int(os.environ.get("SENTINEL_KPI_RETENTION_DAYS", "7")))
 ALERT_CAPTURE_FPS_MIN = float(os.environ.get("SENTINEL_ALERT_CAPTURE_FPS_MIN", "12"))
+ALERT_CAPTURE_DELIVERY_PERCENT_MIN = float(
+    os.environ.get("SENTINEL_ALERT_CAPTURE_DELIVERY_PERCENT_MIN", "85")
+)
 ALERT_INFERENCE_MS_MAX = float(os.environ.get("SENTINEL_ALERT_INFERENCE_MS_MAX", "100"))
 ALERT_TEMPERATURE_C_MAX = float(os.environ.get("SENTINEL_ALERT_TEMPERATURE_C_MAX", "75"))
 ALERT_DISK_USED_PERCENT_MAX = float(
@@ -55,6 +58,7 @@ def initialize_database() -> None:
                 timestamp_ms INTEGER PRIMARY KEY,
                 source_fps REAL NOT NULL DEFAULT 0,
                 capture_fps REAL NOT NULL,
+                capture_delivery_percent REAL NOT NULL DEFAULT 0,
                 detection_fps REAL NOT NULL,
                 preprocess_ms REAL NOT NULL,
                 inference_ms REAL NOT NULL,
@@ -64,7 +68,8 @@ def initialize_database() -> None:
                 last_frame_age_ms INTEGER NOT NULL,
                 capture_read_avg_ms REAL NOT NULL DEFAULT 0,
                 capture_read_max_ms REAL NOT NULL DEFAULT 0,
-                capture_slow_reads INTEGER NOT NULL DEFAULT 0
+                capture_slow_reads INTEGER NOT NULL DEFAULT 0,
+                capture_slow_read_percent REAL NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS events (
@@ -86,9 +91,11 @@ def initialize_database() -> None:
         }
         for name, definition in (
             ("source_fps", "REAL NOT NULL DEFAULT 0"),
+            ("capture_delivery_percent", "REAL NOT NULL DEFAULT 0"),
             ("capture_read_avg_ms", "REAL NOT NULL DEFAULT 0"),
             ("capture_read_max_ms", "REAL NOT NULL DEFAULT 0"),
             ("capture_slow_reads", "INTEGER NOT NULL DEFAULT 0"),
+            ("capture_slow_read_percent", "REAL NOT NULL DEFAULT 0"),
         ):
             if name not in telemetry_columns:
                 connection.execute(f"ALTER TABLE telemetry ADD COLUMN {name} {definition}")
@@ -148,16 +155,18 @@ def ingest() -> dict[str, int]:
         KPI_DIR / "telemetry.jsonl",
         """
         INSERT OR IGNORE INTO telemetry (
-            timestamp_ms, source_fps, capture_fps, detection_fps, preprocess_ms,
+            timestamp_ms, source_fps, capture_fps, capture_delivery_percent,
+            detection_fps, preprocess_ms,
             inference_ms, postprocess_ms, persons, rtsp_reconnects,
             last_frame_age_ms, capture_read_avg_ms, capture_read_max_ms,
-            capture_slow_reads
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            capture_slow_reads, capture_slow_read_percent
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "timestamp_ms",
             "source_fps",
             "capture_fps",
+            "capture_delivery_percent",
             "detection_fps",
             "preprocess_ms",
             "inference_ms",
@@ -168,6 +177,7 @@ def ingest() -> dict[str, int]:
             "capture_read_avg_ms",
             "capture_read_max_ms",
             "capture_slow_reads",
+            "capture_slow_read_percent",
         ),
     )
     event_count = ingest_jsonl(
@@ -313,9 +323,11 @@ def evaluate_alerts(
         add("telemetry_stale", "critical", "Vision telemetry is stale.")
     if latest.get("last_frame_age_ms", 0) > ALERT_TELEMETRY_AGE_SEC_MAX * 1000:
         add("stream_stale", "critical", "No fresh camera frame is available.")
-    if latest.get("capture_fps", ALERT_CAPTURE_FPS_MIN) < ALERT_CAPTURE_FPS_MIN:
-        source_fps = latest.get("source_fps", latest.get("capture_fps", 0))
-        if source_fps < ALERT_CAPTURE_FPS_MIN or latest.get("capture_slow_reads", 0) > 0:
+    capture_fps = latest.get("capture_fps", ALERT_CAPTURE_FPS_MIN)
+    source_fps = latest.get("source_fps", capture_fps)
+    delivery_percent = latest.get("capture_delivery_percent", 100)
+    if capture_fps < ALERT_CAPTURE_FPS_MIN:
+        if source_fps < ALERT_CAPTURE_FPS_MIN:
             add(
                 "camera_throughput_low",
                 "warning",
@@ -323,10 +335,16 @@ def evaluate_alerts(
             )
         else:
             add(
-                "capture_fps_low",
+                "capture_delivery_low",
                 "warning",
-                "Capture FPS is low without camera read stalls; inspect processing load.",
+                "Camera acquisition is healthy but delivered capture FPS is low.",
             )
+    elif source_fps >= ALERT_CAPTURE_FPS_MIN and delivery_percent < ALERT_CAPTURE_DELIVERY_PERCENT_MIN:
+        add(
+            "capture_delivery_low",
+            "warning",
+            "Sentinel is dropping too many acquired frames before processing.",
+        )
     if latest.get("inference_ms", 0) > ALERT_INFERENCE_MS_MAX:
         add("inference_slow", "warning", "Inference latency is above the configured limit.")
     if device.get("temperature_c") is not None and device["temperature_c"] > ALERT_TEMPERATURE_C_MAX:
@@ -431,15 +449,23 @@ def summary(
             """
             SELECT
                 COUNT(*) AS samples,
-                AVG(source_fps) AS source_fps_avg,
+                COUNT(CASE WHEN source_fps > 0 THEN 1 END) AS diagnostic_samples,
+                AVG(CASE WHEN source_fps > 0 THEN source_fps END) AS source_fps_avg,
                 AVG(capture_fps) AS capture_fps_avg,
+                AVG(CASE WHEN source_fps > 0 THEN capture_delivery_percent END)
+                    AS capture_delivery_percent_avg,
                 AVG(detection_fps) AS detection_fps_avg,
                 AVG(inference_ms) AS inference_ms_avg,
                 MAX(rtsp_reconnects) AS rtsp_reconnects,
                 MAX(last_frame_age_ms) AS last_frame_age_ms_max,
-                AVG(capture_read_avg_ms) AS capture_read_avg_ms,
-                MAX(capture_read_max_ms) AS capture_read_max_ms,
-                SUM(capture_slow_reads) AS capture_slow_reads
+                AVG(CASE WHEN source_fps > 0 THEN capture_read_avg_ms END)
+                    AS capture_read_avg_ms,
+                MAX(CASE WHEN source_fps > 0 THEN capture_read_max_ms END)
+                    AS capture_read_max_ms,
+                SUM(CASE WHEN source_fps > 0 THEN capture_slow_reads ELSE 0 END)
+                    AS capture_slow_reads,
+                AVG(CASE WHEN source_fps > 0 THEN capture_slow_read_percent END)
+                    AS capture_slow_read_percent_avg
             FROM telemetry WHERE timestamp_ms >= ?
             """,
             (cutoff_ms,),

@@ -8,6 +8,7 @@
 struct TelemetryKpi {
     double source_fps{0.0};
     double capture_fps{0.0};
+    double capture_delivery_percent{0.0};
     double detection_fps{0.0};
     double preprocess_ms{0.0};
     double inference_ms{0.0};
@@ -18,6 +19,7 @@ struct TelemetryKpi {
     double capture_read_avg_ms{0.0};
     double capture_read_max_ms{0.0};
     std::uint64_t capture_slow_reads{0};
+    double capture_slow_read_percent{0.0};
 };
 
 class KpiWriter {

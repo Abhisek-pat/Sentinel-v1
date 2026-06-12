@@ -45,6 +45,7 @@ void KpiWriter::writeTelemetry(const TelemetryKpi& telemetry) {
                       << "{\"timestamp_ms\":" << unixTimeMilliseconds()
                       << ",\"source_fps\":" << telemetry.source_fps
                       << ",\"capture_fps\":" << telemetry.capture_fps
+                      << ",\"capture_delivery_percent\":" << telemetry.capture_delivery_percent
                       << ",\"detection_fps\":" << telemetry.detection_fps
                       << ",\"preprocess_ms\":" << telemetry.preprocess_ms
                       << ",\"inference_ms\":" << telemetry.inference_ms
@@ -55,6 +56,7 @@ void KpiWriter::writeTelemetry(const TelemetryKpi& telemetry) {
                       << ",\"capture_read_avg_ms\":" << telemetry.capture_read_avg_ms
                       << ",\"capture_read_max_ms\":" << telemetry.capture_read_max_ms
                       << ",\"capture_slow_reads\":" << telemetry.capture_slow_reads
+                      << ",\"capture_slow_read_percent\":" << telemetry.capture_slow_read_percent
                       << "}\n";
     telemetry_stream_.flush();
 }

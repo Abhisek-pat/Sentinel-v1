@@ -372,10 +372,18 @@ bool Pipeline::run() {
             const CaptureDiagnostics capture_diagnostics = video_source.takeDiagnostics();
             const double source_fps =
                 static_cast<double>(capture_diagnostics.successful_reads) / telemetry_elapsed_sec;
+            const double capture_delivery_percent =
+                source_fps > 0.0 ? std::min(100.0, capture_fps / source_fps * 100.0) : 0.0;
+            const double capture_slow_read_percent =
+                capture_diagnostics.reads > 0
+                    ? static_cast<double>(capture_diagnostics.slow_reads) /
+                          static_cast<double>(capture_diagnostics.reads) * 100.0
+                    : 0.0;
 
             std::cout << std::fixed << std::setprecision(2)
                       << "[Telemetry] source_fps=" << source_fps
                       << " capture_fps=" << capture_fps
+                      << " capture_delivery_percent=" << capture_delivery_percent
                       << " detection_fps=" << detection_fps
                       << " preprocess_ms="
                       << (telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0)
@@ -389,11 +397,13 @@ bool Pipeline::run() {
                       << " capture_read_avg_ms=" << capture_diagnostics.average_read_ms
                       << " capture_read_max_ms=" << capture_diagnostics.max_read_ms
                       << " capture_slow_reads=" << capture_diagnostics.slow_reads
+                      << " capture_slow_read_percent=" << capture_slow_read_percent
                       << "\n";
 
             kpi_writer.writeTelemetry({
                 source_fps,
                 capture_fps,
+                capture_delivery_percent,
                 detection_fps,
                 telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0,
                 telemetry_inferences > 0 ? telemetry_inference_ms / inference_count : 0.0,
@@ -403,7 +413,8 @@ bool Pipeline::run() {
                 video_source.lastFrameAgeMilliseconds(),
                 capture_diagnostics.average_read_ms,
                 capture_diagnostics.max_read_ms,
-                capture_diagnostics.slow_reads
+                capture_diagnostics.slow_reads,
+                capture_slow_read_percent
             });
 
             telemetry_window_start_sec = telemetry_now_sec;

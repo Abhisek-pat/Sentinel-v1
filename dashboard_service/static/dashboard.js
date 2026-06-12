@@ -69,9 +69,10 @@ function update(data) {
   $("throttled").textContent = device.throttled ?? "Unavailable";
   $("frame-age").textContent = latest.last_frame_age_ms == null ? "--" : `${latest.last_frame_age_ms} ms`;
   $("source-fps").textContent = latest.source_fps == null ? "--" : `${number(latest.source_fps, 2)} FPS`;
+  $("delivery-percent").textContent = latest.capture_delivery_percent == null ? "--" : `${number(latest.capture_delivery_percent, 1)}%`;
   $("read-average").textContent = latest.capture_read_avg_ms == null ? "--" : `${number(latest.capture_read_avg_ms, 1)} ms`;
   $("read-maximum").textContent = latest.capture_read_max_ms == null ? "--" : `${number(latest.capture_read_max_ms, 1)} ms`;
-  $("slow-reads").textContent = latest.capture_slow_reads ?? "--";
+  $("slow-read-percent").textContent = latest.capture_slow_read_percent == null ? "--" : `${number(latest.capture_slow_read_percent, 1)}%`;
   $("uptime").textContent = duration(device.uptime_sec);
   setMeter("memory-meter", "memory-label", device.memory_used_percent);
   setMeter("disk-meter", "disk-label", device.disk_used_percent);
