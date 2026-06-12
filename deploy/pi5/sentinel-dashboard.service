@@ -6,6 +6,7 @@ After=sentinel.service
 Type=simple
 User=sentinel
 Group=sentinel
+SupplementaryGroups=video
 Environment=SENTINEL_KPI_DIR=/var/lib/sentinel/kpi
 Environment=SENTINEL_KPI_DATABASE=/var/lib/sentinel/dashboard/kpi.db
 ExecStart=/opt/sentinel/dashboard-venv/bin/uvicorn app:app --app-dir /opt/sentinel/share/sentinel/dashboard_service --host 0.0.0.0 --port 8080

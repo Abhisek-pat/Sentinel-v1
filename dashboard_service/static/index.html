@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel Operations</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Sentinel Operations</h1>
+      <p id="updated">Waiting for telemetry</p>
+    </div>
+    <div class="status" id="system-status"><span></span>Checking</div>
+  </header>
+
+  <main>
+    <section class="kpi-grid" aria-label="Primary KPIs">
+      <article><label>Capture</label><strong id="capture-fps">--</strong><small>FPS</small></article>
+      <article><label>Detection</label><strong id="detection-fps">--</strong><small>FPS</small></article>
+      <article><label>Inference</label><strong id="inference-ms">--</strong><small>milliseconds</small></article>
+      <article><label>People</label><strong id="persons">--</strong><small>currently visible</small></article>
+      <article><label>Temperature</label><strong id="temperature">--</strong><small>degrees Celsius</small></article>
+      <article><label>Reconnects</label><strong id="reconnects">--</strong><small>RTSP recoveries</small></article>
+    </section>
+
+    <section class="band split">
+      <div>
+        <div class="section-heading">
+          <div><h2>Vision Performance</h2><p>Last 60 minutes of capture and detection throughput</p></div>
+          <div class="legend"><span class="capture"></span>Capture <span class="detect"></span>Detection</div>
+        </div>
+        <canvas id="performance-chart" height="220"></canvas>
+      </div>
+      <aside class="health-panel">
+        <div class="section-heading"><div><h2>Pi Health</h2><p>Resource headroom</p></div></div>
+        <div class="meter-row"><span>Memory</span><b id="memory-label">--</b><div><i id="memory-meter"></i></div></div>
+        <div class="meter-row"><span>Storage</span><b id="disk-label">--</b><div><i id="disk-meter"></i></div></div>
+        <dl>
+          <div><dt>Throttling</dt><dd id="throttled">--</dd></div>
+          <div><dt>Last frame age</dt><dd id="frame-age">--</dd></div>
+          <div><dt>System uptime</dt><dd id="uptime">--</dd></div>
+        </dl>
+      </aside>
+    </section>
+
+    <section class="band">
+      <div class="section-heading">
+        <div><h2>Event Quality</h2><p>Indicators used to tune tracking and zone stability</p></div>
+      </div>
+      <div class="quality-grid">
+        <div><span>Unique tracks</span><strong id="unique-tracks">--</strong></div>
+        <div><span>Scene entries</span><strong id="scene-entries">--</strong></div>
+        <div><span>Scene exits</span><strong id="scene-exits">--</strong></div>
+        <div><span>Short zone exits</span><strong id="short-exits">--</strong></div>
+        <div><span>Loitering</span><strong id="loitering">--</strong></div>
+        <div><span>Clips saved</span><strong id="clips">--</strong></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="section-heading">
+        <div><h2>Recent Events</h2><p>Latest persisted scene, zone, and recording activity</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Type</th><th>Message</th></tr></thead>
+          <tbody id="events-table"><tr><td colspan="3">Waiting for events</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>

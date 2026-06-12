@@ -64,8 +64,11 @@ curl http://127.0.0.1:8080/api/summary
 curl "http://127.0.0.1:8080/api/events?limit=20"
 ```
 
-The current service listens on port 8080 for LAN testing. Authentication and
-secure remote access are scheduled before production exposure.
+Open the visual operations dashboard at `http://<pi-ip-address>:8080/`.
+It shows stream performance, Pi health, reconnects, event quality, and recent
+events. The current service listens on port 8080 for LAN testing.
+Authentication and secure remote access are scheduled before production
+exposure.
 
 ## First-Device Benchmark
 
