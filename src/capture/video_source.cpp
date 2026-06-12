@@ -6,6 +6,16 @@
 #include <iostream>
 #include <thread>
 
+namespace {
+
+std::int64_t steadyClockMilliseconds() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
+}  // namespace
+
 VideoSource::VideoSource(const std::string& source)
     : source_(source) {}
 
@@ -68,7 +78,13 @@ bool VideoSource::openInternal() {
         );
 #endif
 
-        cap_.open(source_, cv::CAP_FFMPEG);
+        cap_.open(
+            source_,
+            cv::CAP_FFMPEG,
+            {
+                cv::CAP_PROP_OPEN_TIMEOUT_MSEC, 5000,
+                cv::CAP_PROP_READ_TIMEOUT_MSEC, 10000
+            });
         cap_.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
     } else {
@@ -104,6 +120,25 @@ bool VideoSource::openInternal() {
     return true;
 }
 
+bool VideoSource::reconnectRtsp() {
+    frame_ready_ = false;
+    cap_.release();
+
+    while (running_) {
+        std::cerr << "[Sentinel] Reconnecting RTSP stream.\n";
+        if (openInternal()) {
+            reconnect_count_++;
+            std::cout << "[Sentinel] RTSP stream reconnected. Count: "
+                      << reconnect_count_.load() << "\n";
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+
+    return false;
+}
+
 bool VideoSource::open() {
     if (!openInternal()) {
         return false;
@@ -128,19 +163,18 @@ void VideoSource::captureLoop() {
                 latest_frame_ = frame;
                 latest_frame_id_++;
                 frame_ready_ = true;
+                last_frame_time_ms_ = steadyClockMilliseconds();
             }
         } else {
-            std::cerr << "[Sentinel] RTSP frame read failed in background thread. Retrying...\n";
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::cerr << "[Sentinel] RTSP frame read failed in background thread.\n";
+            if (!reconnectRtsp()) {
+                break;
+            }
         }
     }
 }
 
 bool VideoSource::read(cv::Mat& frame) {
-    if (!cap_.isOpened()) {
-        return false;
-    }
-
     if (isRtspSource()) {
         if (!frame_ready_) {
             return false;
@@ -161,6 +195,10 @@ bool VideoSource::read(cv::Mat& frame) {
         frame = latest_frame_.clone();
         delivered_frame_id_ = latest_frame_id_;
         return true;
+    }
+
+    if (!cap_.isOpened()) {
+        return false;
     }
 
     const bool read_ok = cap_.read(frame) && !frame.empty();
@@ -190,4 +228,17 @@ int VideoSource::width() const {
 
 int VideoSource::height() const {
     return static_cast<int>(cap_.get(cv::CAP_PROP_FRAME_HEIGHT));
+}
+
+std::uint64_t VideoSource::reconnectCount() const {
+    return reconnect_count_.load();
+}
+
+std::int64_t VideoSource::lastFrameAgeMilliseconds() const {
+    const std::int64_t last_frame_time = last_frame_time_ms_.load();
+    if (last_frame_time < 0) {
+        return -1;
+    }
+
+    return steadyClockMilliseconds() - last_frame_time;
 }

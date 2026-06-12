@@ -123,3 +123,50 @@ endif()
 
 install(TARGETS sentinel RUNTIME DESTINATION bin)
 install(FILES models/yolo/model_320.onnx DESTINATION share/sentinel/models/yolo)
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(tracker_test
+        tests/tracker_test.cpp
+        src/tracking/tracker.cpp
+    )
+    target_include_directories(tracker_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${OpenCV_INCLUDE_DIRS}
+    )
+    target_link_libraries(tracker_test PRIVATE ${OpenCV_LIBS})
+    add_test(NAME tracker_test COMMAND tracker_test)
+
+    add_executable(event_engine_test
+        tests/event_engine_test.cpp
+        src/events/event_engine.cpp
+    )
+    target_include_directories(event_engine_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${OpenCV_INCLUDE_DIRS}
+    )
+    target_link_libraries(event_engine_test PRIVATE ${OpenCV_LIBS})
+    add_test(NAME event_engine_test COMMAND event_engine_test)
+
+    add_executable(zone_manager_test
+        tests/zone_manager_test.cpp
+        src/zones/zone_manager.cpp
+    )
+    target_include_directories(zone_manager_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${OpenCV_INCLUDE_DIRS}
+    )
+    target_link_libraries(zone_manager_test PRIVATE ${OpenCV_LIBS})
+    add_test(NAME zone_manager_test COMMAND zone_manager_test)
+
+    if(MSVC)
+        target_compile_options(tracker_test PRIVATE /W4 /EHsc)
+        target_compile_options(event_engine_test PRIVATE /W4 /EHsc)
+        target_compile_options(zone_manager_test PRIVATE /W4 /EHsc)
+    else()
+        target_compile_options(tracker_test PRIVATE -Wall -Wextra)
+        target_compile_options(event_engine_test PRIVATE -Wall -Wextra)
+        target_compile_options(zone_manager_test PRIVATE -Wall -Wextra)
+    endif()
+endif()

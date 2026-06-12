@@ -69,7 +69,8 @@ Telemetry lines provide the primary baseline:
 
 For the configured interval of three, `detection_fps` should be approximately
 one third of `capture_fps`. Investigate sustained capture-rate drops, rising
-inference latency, thermal throttling, or repeated RTSP read failures.
+inference latency, thermal throttling, or repeated RTSP reconnects.
+`last_frame_age_ms` should normally remain well below 1000.
 
 Tune only one variable at a time:
 

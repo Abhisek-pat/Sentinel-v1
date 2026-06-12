@@ -21,12 +21,15 @@ public:
     double fps() const;
     int width() const;
     int height() const;
+    std::uint64_t reconnectCount() const;
+    std::int64_t lastFrameAgeMilliseconds() const;
 
 private:
     bool isWebcamSource() const;
     int webcamIndex() const;
     bool isRtspSource() const;
     bool openInternal();
+    bool reconnectRtsp();
     void captureLoop();
 
 private:
@@ -40,6 +43,8 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> frame_ready_{false};
     std::atomic<bool> end_of_stream_{false};
+    std::atomic<std::uint64_t> reconnect_count_{0};
+    std::atomic<std::int64_t> last_frame_time_ms_{-1};
 
     std::uint64_t latest_frame_id_{0};
     std::uint64_t delivered_frame_id_{0};

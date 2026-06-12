@@ -371,6 +371,8 @@ bool Pipeline::run() {
                       << " postprocess_ms="
                       << (telemetry_inferences > 0 ? telemetry_postprocess_ms / inference_count : 0.0)
                       << " persons=" << person_detections.size()
+                      << " rtsp_reconnects=" << video_source.reconnectCount()
+                      << " last_frame_age_ms=" << video_source.lastFrameAgeMilliseconds()
                       << "\n";
 
             telemetry_window_start_sec = telemetry_now_sec;
