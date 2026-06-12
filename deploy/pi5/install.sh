@@ -48,17 +48,27 @@ if [[ ! -f /etc/sentinel/sentinel.env ]]; then
 fi
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel.service" /etc/systemd/system/sentinel.service
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-dashboard.service" /etc/systemd/system/sentinel-dashboard.service
+install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-llm.service" /etc/systemd/system/sentinel-llm.service
 
 python3 -m venv /opt/sentinel/dashboard-venv
 /opt/sentinel/dashboard-venv/bin/pip install --upgrade pip
 /opt/sentinel/dashboard-venv/bin/pip install \
   -r /opt/sentinel/share/sentinel/dashboard_service/requirements.txt
 
+python3 -m venv /opt/sentinel/llm-venv
+/opt/sentinel/llm-venv/bin/pip install --upgrade pip
+/opt/sentinel/llm-venv/bin/pip install \
+  -r /opt/sentinel/share/sentinel/llm_service/requirements.txt
+/opt/sentinel/llm-venv/bin/python -m unittest discover \
+  -s "${ROOT_DIR}/tests" -p test_llm_service.py -v
+
 systemctl daemon-reload
 systemctl enable sentinel.service
 systemctl enable sentinel-dashboard.service
+systemctl enable sentinel-llm.service
 
 echo
 echo "Sentinel is installed but not started."
 echo "Edit /etc/sentinel/sentinel.env, then run: sudo systemctl start sentinel"
 echo "Start the KPI API with: sudo systemctl start sentinel-dashboard"
+echo "Start the mock reasoning API with: sudo systemctl start sentinel-llm"

@@ -74,6 +74,26 @@ excessive short zone exits. The current service listens on port 8080 for LAN tes
 Authentication and secure remote access are scheduled before production
 exposure.
 
+## Reasoning API
+
+The Pi installer deploys a separate reasoning sidecar on loopback port `8090`.
+It defaults to the deterministic `mock` provider, requires no API key, and does
+not affect the real-time vision process.
+
+```bash
+sudo systemctl start sentinel-llm
+sudo systemctl status sentinel-llm
+curl http://127.0.0.1:8090/health
+curl http://127.0.0.1:8090/providers
+curl -X POST http://127.0.0.1:8090/reason \
+  -H "Content-Type: application/json" \
+  -d '{"scene_state":{"persons":[],"recent_events":[]}}'
+```
+
+Use `/benchmark` to run the same SceneState repeatedly against selected
+providers. Real model adapters will be added after the mock contract and Pi
+service behavior are validated.
+
 ## First-Device Benchmark
 
 Run the real camera feed for at least 30 minutes. Watch logs, temperature,

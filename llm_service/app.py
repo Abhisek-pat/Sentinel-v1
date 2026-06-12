@@ -1,78 +1,109 @@
-import json
 import os
+import time
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from openai import OpenAI
+from pydantic import BaseModel, Field
 
-app = FastAPI()
-
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+from providers import ProviderError, ReasoningResult, create_providers
 
 
 class SceneRequest(BaseModel):
     scene_state: dict[str, Any]
+    provider: str | None = None
+
+
+class BenchmarkRequest(BaseModel):
+    scene_state: dict[str, Any]
+    providers: list[str] = Field(default_factory=list)
+    iterations: int = Field(default=1, ge=1, le=20)
+
+
+def result_payload(result: ReasoningResult, latency_ms: float) -> dict[str, Any]:
+    return {
+        "summary": result.summary,
+        "risk_level": result.risk_level,
+        "recommended_action": result.recommended_action,
+        "provider": result.provider,
+        "model": result.model,
+        "latency_ms": round(latency_ms, 2),
+        "success": True,
+    }
+
+
+app = FastAPI(title="Sentinel Reasoning Service", version="0.1.0")
+providers = create_providers()
+default_provider = os.environ.get("SENTINEL_LLM_PROVIDER", "mock")
+
+
+def reason(scene_state: dict[str, Any], provider_name: str | None = None) -> dict[str, Any]:
+    selected_name = provider_name or default_provider
+    provider = providers.get(selected_name)
+    if provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown provider '{selected_name}'. Available: {sorted(providers)}",
+        )
+
+    started = time.perf_counter()
+    try:
+        result = provider.reason(scene_state)
+    except ProviderError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    return result_payload(result, (time.perf_counter() - started) * 1000.0)
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "default_provider": default_provider,
+        "providers": sorted(providers),
+    }
+
+
+@app.get("/providers")
+def list_providers() -> dict[str, Any]:
+    return {
+        "default": default_provider,
+        "providers": [
+            {
+                "name": name,
+                "model": provider.model,
+                "available": provider.available(),
+            }
+            for name, provider in sorted(providers.items())
+        ],
+    }
 
 
 @app.post("/reason")
-def reason_over_scene(req: SceneRequest) -> dict[str, Any]:
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set")
+def reason_over_scene(request: SceneRequest) -> dict[str, Any]:
+    return reason(request.scene_state, request.provider)
 
-    scene_json = json.dumps(req.scene_state, indent=2)
 
-    developer_prompt = (
-    "You are a surveillance reasoning engine. "
-    "Use only the provided structured scene state. "
-    "Do not invent people, zones, or events. "
-    "Be concise. Keep the summary under 18 words. "
-    "Return strict JSON with summary, risk_level, and recommended_action."
-)
+@app.post("/benchmark")
+def benchmark(request: BenchmarkRequest) -> dict[str, Any]:
+    selected = request.providers or sorted(providers)
+    runs: list[dict[str, Any]] = []
 
-    user_prompt = f"""
-Given this scene state:
-
-{scene_json}
-
-Return JSON in this format:
-{{
-  "summary": "string",
-  "risk_level": "low | medium | high",
-  "recommended_action": "string"
-}}
-"""
-
-    try:
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=[
-                {"role": "developer", "content": developer_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "scene_reasoning",
-                    "schema": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "summary": {"type": "string"},
-                            "risk_level": {
-                                "type": "string",
-                                "enum": ["low", "medium", "high"]
-                            },
-                            "recommended_action": {"type": "string"}
-                        },
-                        "required": ["summary", "risk_level", "recommended_action"]
+    for provider_name in selected:
+        for iteration in range(request.iterations):
+            try:
+                run = reason(request.scene_state, provider_name)
+                run["iteration"] = iteration + 1
+                runs.append(run)
+            except HTTPException as error:
+                runs.append(
+                    {
+                        "provider": provider_name,
+                        "iteration": iteration + 1,
+                        "success": False,
+                        "error": error.detail,
                     }
-                }
-            }
-        )
+                )
 
-        raw_text = response.output_text
-        return json.loads(raw_text)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "scene_persons": len(request.scene_state.get("persons", [])),
+        "runs": runs,
+    }

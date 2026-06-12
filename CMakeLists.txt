@@ -124,11 +124,20 @@ endif()
 
 install(TARGETS sentinel RUNTIME DESTINATION bin)
 install(FILES models/yolo/model_320.onnx DESTINATION share/sentinel/models/yolo)
-install(DIRECTORY dashboard_service DESTINATION share/sentinel)
+install(DIRECTORY dashboard_service DESTINATION share/sentinel
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
+install(DIRECTORY llm_service DESTINATION share/sentinel
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
 
 include(CTest)
 
 if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter)
+
     add_executable(tracker_test
         tests/tracker_test.cpp
         src/tracking/tracker.cpp
@@ -161,6 +170,27 @@ if(BUILD_TESTING)
     )
     target_link_libraries(zone_manager_test PRIVATE ${OpenCV_LIBS})
     add_test(NAME zone_manager_test COMMAND zone_manager_test)
+
+    if(Python3_Interpreter_FOUND)
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} -c "import fastapi"
+            RESULT_VARIABLE SENTINEL_FASTAPI_IMPORT_RESULT
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+    endif()
+
+    if(Python3_Interpreter_FOUND AND SENTINEL_FASTAPI_IMPORT_RESULT EQUAL 0)
+        add_test(
+            NAME llm_service_test
+            COMMAND ${Python3_EXECUTABLE} -m unittest discover
+                -s ${CMAKE_CURRENT_SOURCE_DIR}/tests
+                -p test_llm_service.py
+                -v
+        )
+    elseif(Python3_Interpreter_FOUND)
+        message(STATUS "Skipping llm_service_test: FastAPI is unavailable to ${Python3_EXECUTABLE}")
+    endif()
 
     if(MSVC)
         target_compile_options(tracker_test PRIVATE /W4 /EHsc)

@@ -29,7 +29,22 @@ The diagram uses the **Midnight Operations Dashboard** theme:
 
 ## Optional Reasoning Service
 
-`llm_service/app.py` and `src/reasoning/llm_client.*` define an OpenAI-backed reasoning path. This path is shown as dashed because the client is not included in the current CMake target and the pipeline does not call it.
+`llm_service/` is a provider-neutral FastAPI sidecar. It currently ships with a
+deterministic `mock` provider that validates the service contract without API
+keys or network access. The service exposes:
+
+- `POST /reason` for one provider inference.
+- `POST /benchmark` for repeated, comparable provider runs.
+- `GET /providers` for provider and model discovery.
+- `GET /health` for service readiness.
+
+Each successful response includes the summary, risk level, recommended action,
+provider, model, and request latency. Sentinel does not call this service from
+the real-time pipeline yet; the next integration increment will invoke it
+asynchronously so capture and inference cannot be blocked by model latency.
+
+`src/reasoning/llm_client.*` is the earlier Windows-only synchronous prototype
+and remains outside the CMake target.
 
 ## Key Outputs
 
