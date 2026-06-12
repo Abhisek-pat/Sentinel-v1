@@ -1,12 +1,16 @@
 #include "zones/zone_manager.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <unordered_set>
 
 ZoneManager::ZoneManager() = default;
 
 void ZoneManager::initialize(int frame_width, int frame_height) {
     zones_.clear();
+    zone_states_.clear();
+    entry_observations_.clear();
 
     zones_.push_back({
         "CENTER_ZONE",
@@ -20,28 +24,58 @@ void ZoneManager::initialize(int frame_width, int frame_height) {
     });
 }
 
-bool ZoneManager::isInside(const cv::Rect& box, const cv::Rect& zone) const {
+bool ZoneManager::centerInside(const cv::Rect& box, const cv::Rect& zone) {
     cv::Point center(box.x + box.width / 2, box.y + box.height / 2);
     return zone.contains(center);
+}
+
+cv::Rect ZoneManager::entryArea(const cv::Rect& zone) const {
+    const int margin_x =
+        std::min(zone.width / 3, std::max(4, static_cast<int>(zone.width * boundary_margin_ratio_)));
+    const int margin_y =
+        std::min(zone.height / 3, std::max(4, static_cast<int>(zone.height * boundary_margin_ratio_)));
+    return cv::Rect(
+        zone.x + margin_x,
+        zone.y + margin_y,
+        zone.width - 2 * margin_x,
+        zone.height - 2 * margin_y);
+}
+
+cv::Rect ZoneManager::stayArea(const cv::Rect& zone) const {
+    const int margin_x = std::max(4, static_cast<int>(zone.width * boundary_margin_ratio_));
+    const int margin_y = std::max(4, static_cast<int>(zone.height * boundary_margin_ratio_));
+    return cv::Rect(
+        zone.x - margin_x,
+        zone.y - margin_y,
+        zone.width + 2 * margin_x,
+        zone.height + 2 * margin_y);
 }
 
 std::vector<ZoneEvent> ZoneManager::update(const std::vector<Detection>& detections,
                                            double current_time_sec) {
     std::vector<ZoneEvent> events;
+    std::unordered_set<int> visible_track_ids;
 
     for (const auto& det : detections) {
         if (det.class_name != "person") {
             continue;
         }
+        visible_track_ids.insert(det.track_id);
 
         for (const auto& zone : zones_) {
-            bool inside = isInside(det.box, zone.area);
-
             auto& zone_map = zone_states_[zone.name];
+            auto& entry_map = entry_observations_[zone.name];
             auto it = zone_map.find(det.track_id);
+            const bool clearly_inside = centerInside(det.box, entryArea(zone.area));
+            const bool within_stay_area = centerInside(det.box, stayArea(zone.area));
 
-            if (inside) {
-                if (it == zone_map.end()) {
+            if (it == zone_map.end()) {
+                if (clearly_inside) {
+                    const int observations = ++entry_map[det.track_id];
+                    if (observations < entry_confirmation_observations_) {
+                        continue;
+                    }
+
                     ZoneState state;
                     state.track_id = det.track_id;
                     state.enter_time = current_time_sec;
@@ -50,49 +84,71 @@ std::vector<ZoneEvent> ZoneManager::update(const std::vector<Detection>& detecti
                     state.loitering_triggered = false;
 
                     zone_map[det.track_id] = state;
+                    entry_map.erase(det.track_id);
 
                     std::ostringstream oss;
                     oss << "[Zone] Track " << det.track_id
                         << " entered " << zone.name;
                     events.push_back({oss.str()});
                 } else {
-                    auto& state = it->second;
-                    state.last_seen_time = current_time_sec;
+                    entry_map.erase(det.track_id);
+                }
+                continue;
+            }
 
-                    const double dwell = current_time_sec - state.enter_time;
+            auto& state = it->second;
+            if (within_stay_area) {
+                state.last_seen_time = current_time_sec;
+                state.outside_observations = 0;
 
-                    if (dwell > loiter_threshold_sec_ && !state.loitering_triggered) {
-                        std::ostringstream oss;
-                        oss << "[Zone] Track " << det.track_id
-                            << " loitering in " << zone.name
-                            << " for " << dwell << "s";
-                        events.push_back({oss.str()});
-
-                        state.loitering_triggered = true;
-                    }
+                const double dwell = current_time_sec - state.enter_time;
+                if (dwell > loiter_threshold_sec_ && !state.loitering_triggered) {
+                    std::ostringstream oss;
+                    oss << "[Zone] Track " << det.track_id
+                        << " loitering in " << zone.name
+                        << " for " << dwell << "s";
+                    events.push_back({oss.str()});
+                    state.loitering_triggered = true;
                 }
             } else {
-                // Keep the state briefly so boundary jitter does not emit
-                // repeated exit and entry events.
+                state.outside_observations++;
             }
         }
     }
 
     for (const auto& zone : zones_) {
         auto& zone_map = zone_states_[zone.name];
+        auto& entry_map = entry_observations_[zone.name];
+
+        for (auto it = entry_map.begin(); it != entry_map.end();) {
+            if (visible_track_ids.find(it->first) == visible_track_ids.end()) {
+                it = entry_map.erase(it);
+            } else {
+                ++it;
+            }
+        }
 
         for (auto it = zone_map.begin(); it != zone_map.end();) {
+            if (visible_track_ids.find(it->first) == visible_track_ids.end()) {
+                it->second.outside_observations++;
+            }
+
             const double time_since_inside = current_time_sec - it->second.last_seen_time;
-            if (it->second.inside && time_since_inside >= exit_timeout_sec_) {
+            if (it->second.inside &&
+                it->second.outside_observations >= exit_confirmation_observations_ &&
+                time_since_inside >= exit_timeout_sec_) {
                 const double dwell = it->second.last_seen_time - it->second.enter_time;
 
-                std::ostringstream oss;
-                oss << "[Zone] Track " << it->first
-                    << " exited " << zone.name
-                    << " after " << std::fixed << std::setprecision(1)
-                    << dwell << "s";
-                events.push_back({oss.str()});
+                if (dwell >= min_exit_event_dwell_sec_) {
+                    std::ostringstream oss;
+                    oss << "[Zone] Track " << it->first
+                        << " exited " << zone.name
+                        << " after " << std::fixed << std::setprecision(1)
+                        << dwell << "s";
+                    events.push_back({oss.str()});
+                }
 
+                entry_map.erase(it->first);
                 it = zone_map.erase(it);
             } else {
                 ++it;

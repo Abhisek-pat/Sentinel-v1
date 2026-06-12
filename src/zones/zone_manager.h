@@ -38,14 +38,22 @@ private:
         double last_seen_time{0.0};
         bool inside{false};
         bool loitering_triggered{false};
+        int outside_observations{0};
     };
 
 private:
     std::vector<Zone> zones_;
     std::unordered_map<std::string, std::unordered_map<int, ZoneState>> zone_states_;
+    std::unordered_map<std::string, std::unordered_map<int, int>> entry_observations_;
     double loiter_threshold_sec_{10.0};
     double exit_timeout_sec_{1.5};
+    double min_exit_event_dwell_sec_{2.0};
+    double boundary_margin_ratio_{0.08};
+    int entry_confirmation_observations_{2};
+    int exit_confirmation_observations_{3};
 
 private:
-    bool isInside(const cv::Rect& box, const cv::Rect& zone) const;
+    static bool centerInside(const cv::Rect& box, const cv::Rect& zone);
+    cv::Rect entryArea(const cv::Rect& zone) const;
+    cv::Rect stayArea(const cv::Rect& zone) const;
 };

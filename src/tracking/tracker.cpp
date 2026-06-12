@@ -72,6 +72,8 @@ std::vector<Detection> Tracker::update(const std::vector<Detection>& detections)
         track.class_id = detection.class_id;
         track.class_name = detection.class_name;
         track.missing_frames = 0;
+        track.matched_frames++;
+        track.confirmed = track.matched_frames >= min_confirmed_frames_;
 
         track_used[candidate.track_index] = true;
         detection_used[candidate.detection_index] = true;
@@ -95,6 +97,8 @@ std::vector<Detection> Tracker::update(const std::vector<Detection>& detections)
         new_track.confidence = detections[i].confidence;
         new_track.box = detections[i].box;
         new_track.missing_frames = 0;
+        new_track.matched_frames = 1;
+        new_track.confirmed = min_confirmed_frames_ <= 1;
         tracks_.push_back(new_track);
     }
 
@@ -111,7 +115,7 @@ std::vector<Detection> Tracker::update(const std::vector<Detection>& detections)
     tracked_detections.reserve(tracks_.size());
 
     for (const auto& track : tracks_) {
-        if (track.missing_frames > 0) {
+        if (track.missing_frames > 0 || !track.confirmed) {
             continue;
         }
 

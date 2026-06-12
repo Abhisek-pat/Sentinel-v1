@@ -20,6 +20,8 @@ private:
         float confidence{0.0f};
         cv::Rect box;
         int missing_frames{0};
+        int matched_frames{0};
+        bool confirmed{false};
     };
 
     static float computeIoU(const cv::Rect& a, const cv::Rect& b);
@@ -29,4 +31,5 @@ private:
     int next_track_id_{0};
     float iou_threshold_{0.10f};
     int max_missing_frames_{15};
+    int min_confirmed_frames_{3};
 };
