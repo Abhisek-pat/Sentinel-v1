@@ -79,12 +79,19 @@ function update(data) {
   $("loitering").textContent = quality.loitering_events ?? "--";
   $("clips").textContent = quality.clip_events ?? "--";
 
-  const stale = data.telemetry_age_sec == null || data.telemetry_age_sec > 90;
-  const throttled = device.throttled && device.throttled !== "0x0";
+  const alerts = data.alerts || [];
+  const critical = alerts.some((alert) => alert.severity === "critical");
   const status = $("system-status");
-  status.className = `status ${stale || throttled ? "bad" : "good"}`;
-  status.innerHTML = `<span></span>${stale ? "Telemetry stale" : throttled ? "Throttling detected" : "System healthy"}`;
+  status.className = `status ${alerts.length ? "bad" : "good"}`;
+  status.innerHTML = `<span></span>${critical ? "Critical alert" : alerts.length ? `${alerts.length} warning${alerts.length > 1 ? "s" : ""}` : "System healthy"}`;
   $("updated").textContent = data.telemetry_age_sec == null ? "No telemetry yet" : `Updated ${number(data.telemetry_age_sec, 0)} seconds ago`;
+  $("chart-subtitle").textContent = `${$("window-select").selectedOptions[0].text} of capture and detection throughput`;
+
+  const alertsPanel = $("alerts");
+  alertsPanel.hidden = alerts.length === 0;
+  alertsPanel.innerHTML = alerts.map((alert) =>
+    `<div class="alert ${escapeHtml(alert.severity)}"><strong>${escapeHtml(alert.code.replaceAll("_", " "))}</strong> ${escapeHtml(alert.message)}</div>`
+  ).join("");
 
   const rows = (data.events || []).map((event) => {
     const time = new Date(event.timestamp_ms).toLocaleTimeString();
@@ -96,7 +103,8 @@ function update(data) {
 
 async function refresh() {
   try {
-    const response = await fetch("/api/dashboard", { cache: "no-store" });
+    const windowMinutes = $("window-select").value;
+    const response = await fetch(`/api/dashboard?window_minutes=${windowMinutes}`, { cache: "no-store" });
     update(await response.json());
   } catch (error) {
     const status = $("system-status");
@@ -106,5 +114,6 @@ async function refresh() {
 }
 
 window.addEventListener("resize", () => refresh());
+$("window-select").addEventListener("change", refresh);
 refresh();
 setInterval(refresh, 10000);

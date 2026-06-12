@@ -66,7 +66,11 @@ curl "http://127.0.0.1:8080/api/events?limit=20"
 
 Open the visual operations dashboard at `http://<pi-ip-address>:8080/`.
 It shows stream performance, Pi health, reconnects, event quality, and recent
-events. The current service listens on port 8080 for LAN testing.
+events. Dashboard filters support one hour through seven days, and the SQLite
+KPI database retains seven days by default. Raw KPI JSONL files are compacted
+after reaching 25 MiB. Active alerts cover stale streams,
+low capture FPS, slow inference, overheating, throttling, low disk space, and
+excessive short zone exits. The current service listens on port 8080 for LAN testing.
 Authentication and secure remote access are scheduled before production
 exposure.
 

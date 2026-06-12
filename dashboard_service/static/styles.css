@@ -21,7 +21,13 @@ p { margin-top: 5px; color: #8e9aa6; font-size: 12px; }
 .status span { width: 9px; height: 9px; border-radius: 50%; background: #d2a72c; }
 .status.good span { background: #3fc380; }
 .status.bad span { background: #ef6461; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+.top-actions label { color: #8e9aa6; font-size: 11px; }
+select { padding: 7px 28px 7px 9px; color: #dbe3ea; background: #171c22; border: 1px solid #303840; border-radius: 4px; }
 main { max-width: 1500px; margin: auto; padding: 24px clamp(18px, 4vw, 52px) 48px; }
+.alerts { display: grid; gap: 8px; margin-bottom: 20px; }
+.alert { padding: 11px 13px; border-left: 3px solid #d2a72c; background: #191711; color: #d9d1b2; font-size: 12px; }
+.alert.critical { border-color: #ef6461; background: #1d1214; color: #e7b7b5; }
 .kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: #252b31; border: 1px solid #252b31; border-radius: 6px; overflow: hidden; }
 .kpi-grid article { min-height: 112px; padding: 18px; background: #12161b; display: flex; flex-direction: column; }
 .kpi-grid label, .quality-grid span { color: #8e9aa6; font-size: 12px; }
@@ -58,7 +64,8 @@ td:nth-child(2) { text-transform: uppercase; color: #65c18c; font-size: 10px; }
   .health-panel { border-left: 0; border-top: 1px solid #252b31; padding: 22px 0 0; }
 }
 @media (max-width: 600px) {
-  .topbar { align-items: flex-start; }
+  .topbar { align-items: flex-start; gap: 14px; }
+  .top-actions { align-items: flex-end; flex-direction: column-reverse; }
   .kpi-grid, .quality-grid { grid-template-columns: repeat(2, 1fr); }
   .kpi-grid article { min-height: 100px; padding: 14px; }
   .kpi-grid strong { font-size: 24px; }

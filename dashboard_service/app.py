@@ -6,7 +6,7 @@ import sqlite3
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse
@@ -15,6 +15,23 @@ from fastapi.staticfiles import StaticFiles
 KPI_DIR = Path(os.environ.get("SENTINEL_KPI_DIR", "/var/lib/sentinel/kpi"))
 DATABASE_PATH = Path(
     os.environ.get("SENTINEL_KPI_DATABASE", "/var/lib/sentinel/dashboard/kpi.db")
+)
+RETENTION_DAYS = max(1, int(os.environ.get("SENTINEL_KPI_RETENTION_DAYS", "7")))
+ALERT_CAPTURE_FPS_MIN = float(os.environ.get("SENTINEL_ALERT_CAPTURE_FPS_MIN", "12"))
+ALERT_INFERENCE_MS_MAX = float(os.environ.get("SENTINEL_ALERT_INFERENCE_MS_MAX", "100"))
+ALERT_TEMPERATURE_C_MAX = float(os.environ.get("SENTINEL_ALERT_TEMPERATURE_C_MAX", "75"))
+ALERT_DISK_USED_PERCENT_MAX = float(
+    os.environ.get("SENTINEL_ALERT_DISK_USED_PERCENT_MAX", "85")
+)
+ALERT_SHORT_ZONE_EXIT_RATIO_MAX = float(
+    os.environ.get("SENTINEL_ALERT_SHORT_ZONE_EXIT_RATIO_MAX", "0.5")
+)
+ALERT_TELEMETRY_AGE_SEC_MAX = float(
+    os.environ.get("SENTINEL_ALERT_TELEMETRY_AGE_SEC_MAX", "90")
+)
+JSONL_MAX_BYTES = max(
+    1024 * 1024,
+    int(os.environ.get("SENTINEL_KPI_JSONL_MAX_MB", "25")) * 1024 * 1024,
 )
 
 app = FastAPI(title="Sentinel KPI API")
@@ -53,6 +70,11 @@ def initialize_database() -> None:
                 message TEXT NOT NULL,
                 UNIQUE(timestamp_ms, category, message)
             );
+
+            CREATE TABLE IF NOT EXISTS ingestion_offsets (
+                path TEXT PRIMARY KEY,
+                offset_bytes INTEGER NOT NULL
+            );
             """
         )
 
@@ -61,22 +83,49 @@ def ingest_jsonl(path: Path, insert_sql: str, fields: tuple[str, ...]) -> int:
     if not path.exists():
         return 0
 
+    with connect() as connection:
+        offset_row = connection.execute(
+            "SELECT offset_bytes FROM ingestion_offsets WHERE path = ?", (str(path),)
+        ).fetchone()
+        offset = offset_row["offset_bytes"] if offset_row else 0
+
+    file_size = path.stat().st_size
+    if offset > file_size:
+        offset = 0
+
     rows: list[tuple[Any, ...]] = []
     with path.open("r", encoding="utf-8") as source:
+        source.seek(offset)
         for line in source:
             try:
                 record = json.loads(line)
                 rows.append(tuple(record[field] for field in fields))
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
-
-    if not rows:
-        return 0
+        new_offset = source.tell()
 
     with connect() as connection:
         before = connection.total_changes
-        connection.executemany(insert_sql, rows)
-        return connection.total_changes - before
+        if rows:
+            connection.executemany(insert_sql, rows)
+        connection.execute(
+            """
+            INSERT INTO ingestion_offsets (path, offset_bytes) VALUES (?, ?)
+            ON CONFLICT(path) DO UPDATE SET offset_bytes = excluded.offset_bytes
+            """,
+            (str(path), new_offset),
+        )
+        inserted = connection.total_changes - before - 1
+
+    if new_offset >= JSONL_MAX_BYTES:
+        path.write_text("", encoding="utf-8")
+        with connect() as connection:
+            connection.execute(
+                "UPDATE ingestion_offsets SET offset_bytes = 0 WHERE path = ?",
+                (str(path),),
+            )
+
+    return inserted
 
 
 def ingest() -> dict[str, int]:
@@ -107,6 +156,22 @@ def ingest() -> dict[str, int]:
         ("timestamp_ms", "category", "message"),
     )
     return {"telemetry": telemetry_count, "events": event_count}
+
+
+def cleanup_retention() -> dict[str, int]:
+    cutoff_ms = int((time.time() - RETENTION_DAYS * 86400) * 1000)
+    with connect() as connection:
+        before = connection.total_changes
+        connection.execute("DELETE FROM telemetry WHERE timestamp_ms < ?", (cutoff_ms,))
+        telemetry_deleted = connection.total_changes - before
+        before = connection.total_changes
+        connection.execute("DELETE FROM events WHERE timestamp_ms < ?", (cutoff_ms,))
+        events_deleted = connection.total_changes - before
+    return {"telemetry": telemetry_deleted, "events": events_deleted}
+
+
+def window_cutoff_ms(window_minutes: int) -> int:
+    return int((time.time() - window_minutes * 60) * 1000)
 
 
 def read_meminfo() -> dict[str, int]:
@@ -169,9 +234,14 @@ def device_health() -> dict[str, Any]:
     }
 
 
-def event_quality(connection: sqlite3.Connection) -> dict[str, Any]:
+def event_quality(connection: sqlite3.Connection, cutoff_ms: int) -> dict[str, Any]:
     rows = connection.execute(
-        "SELECT timestamp_ms, category, message FROM events ORDER BY timestamp_ms DESC LIMIT 5000"
+        """
+        SELECT timestamp_ms, category, message
+        FROM events WHERE timestamp_ms >= ?
+        ORDER BY timestamp_ms DESC LIMIT 5000
+        """,
+        (cutoff_ms,),
     ).fetchall()
     track_ids: set[int] = set()
     short_zone_exits = 0
@@ -208,10 +278,47 @@ def event_quality(connection: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
+def evaluate_alerts(
+    latest: dict[str, Any],
+    telemetry_age_sec: float | None,
+    device: dict[str, Any],
+    quality: dict[str, Any],
+) -> list[dict[str, str]]:
+    alerts: list[dict[str, str]] = []
+
+    def add(code: str, severity: str, message: str) -> None:
+        alerts.append({"code": code, "severity": severity, "message": message})
+
+    if telemetry_age_sec is None or telemetry_age_sec > ALERT_TELEMETRY_AGE_SEC_MAX:
+        add("telemetry_stale", "critical", "Vision telemetry is stale.")
+    if latest.get("last_frame_age_ms", 0) > ALERT_TELEMETRY_AGE_SEC_MAX * 1000:
+        add("stream_stale", "critical", "No fresh camera frame is available.")
+    if latest.get("capture_fps", ALERT_CAPTURE_FPS_MIN) < ALERT_CAPTURE_FPS_MIN:
+        add("capture_fps_low", "warning", "Capture FPS is below the configured baseline.")
+    if latest.get("inference_ms", 0) > ALERT_INFERENCE_MS_MAX:
+        add("inference_slow", "warning", "Inference latency is above the configured limit.")
+    if device.get("temperature_c") is not None and device["temperature_c"] > ALERT_TEMPERATURE_C_MAX:
+        add("temperature_high", "critical", "Pi temperature is above the configured limit.")
+    if device.get("throttled") not in (None, "0x0"):
+        add("throttling", "critical", "Pi throttling or undervoltage has been detected.")
+    if (
+        device.get("disk_used_percent") is not None
+        and device["disk_used_percent"] > ALERT_DISK_USED_PERCENT_MAX
+    ):
+        add("disk_high", "critical", "Sentinel storage usage is above the configured limit.")
+
+    tracks = quality.get("unique_tracks", 0)
+    short_exits = quality.get("short_zone_exits", 0)
+    if tracks >= 5 and short_exits / tracks > ALERT_SHORT_ZONE_EXIT_RATIO_MAX:
+        add("zone_jitter", "warning", "Short zone exits indicate excessive boundary jitter.")
+    return alerts
+
+
 @app.on_event("startup")
 def startup() -> None:
     initialize_database()
     ingest()
+    cleanup_retention()
 
 
 @app.get("/health")
@@ -248,28 +355,45 @@ def latest_kpis() -> dict[str, Any]:
 
 
 @app.get("/api/kpis/history")
-def kpi_history(limit: int = Query(default=120, ge=1, le=5000)) -> list[dict[str, Any]]:
+def kpi_history(
+    limit: Annotated[int, Query(ge=1, le=5000)] = 120,
+    window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
+) -> list[dict[str, Any]]:
     ingest()
     with connect() as connection:
         rows = connection.execute(
-            "SELECT * FROM telemetry ORDER BY timestamp_ms DESC LIMIT ?", (limit,)
+            """
+            SELECT * FROM telemetry WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC LIMIT ?
+            """,
+            (window_cutoff_ms(window_minutes), limit),
         ).fetchall()
     return [dict(row) for row in reversed(rows)]
 
 
 @app.get("/api/events")
-def events(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, Any]]:
+def events(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
+) -> list[dict[str, Any]]:
     ingest()
     with connect() as connection:
         rows = connection.execute(
-            "SELECT * FROM events ORDER BY timestamp_ms DESC, id DESC LIMIT ?", (limit,)
+            """
+            SELECT * FROM events WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC, id DESC LIMIT ?
+            """,
+            (window_cutoff_ms(window_minutes), limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
 @app.get("/api/summary")
-def summary() -> dict[str, Any]:
+def summary(
+    window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
+) -> dict[str, Any]:
     ingest()
+    cutoff_ms = window_cutoff_ms(window_minutes)
     with connect() as connection:
         telemetry = connection.execute(
             """
@@ -280,13 +404,18 @@ def summary() -> dict[str, Any]:
                 AVG(inference_ms) AS inference_ms_avg,
                 MAX(rtsp_reconnects) AS rtsp_reconnects,
                 MAX(last_frame_age_ms) AS last_frame_age_ms_max
-            FROM telemetry
-            """
+            FROM telemetry WHERE timestamp_ms >= ?
+            """,
+            (cutoff_ms,),
         ).fetchone()
         categories = connection.execute(
-            "SELECT category, COUNT(*) AS count FROM events GROUP BY category"
+            """
+            SELECT category, COUNT(*) AS count FROM events
+            WHERE timestamp_ms >= ? GROUP BY category
+            """,
+            (cutoff_ms,),
         ).fetchall()
-        quality = event_quality(connection)
+        quality = event_quality(connection, cutoff_ms)
 
     result = dict(telemetry)
     result["events"] = {row["category"]: row["count"] for row in categories}
@@ -295,19 +424,31 @@ def summary() -> dict[str, Any]:
 
 
 @app.get("/api/dashboard")
-def dashboard_data() -> dict[str, Any]:
+def dashboard_data(
+    window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
+) -> dict[str, Any]:
     ingest()
+    cleanup_retention()
+    cutoff_ms = window_cutoff_ms(window_minutes)
     with connect() as connection:
         latest = connection.execute(
             "SELECT * FROM telemetry ORDER BY timestamp_ms DESC LIMIT 1"
         ).fetchone()
         history = connection.execute(
-            "SELECT * FROM telemetry ORDER BY timestamp_ms DESC LIMIT 120"
+            """
+            SELECT * FROM telemetry WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC LIMIT 500
+            """,
+            (cutoff_ms,),
         ).fetchall()
         recent_events = connection.execute(
-            "SELECT * FROM events ORDER BY timestamp_ms DESC, id DESC LIMIT 30"
+            """
+            SELECT * FROM events WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC, id DESC LIMIT 30
+            """,
+            (cutoff_ms,),
         ).fetchall()
-        quality = event_quality(connection)
+        quality = event_quality(connection, cutoff_ms)
 
     latest_dict = dict(latest) if latest else {}
     latest_timestamp = latest_dict.get("timestamp_ms")
@@ -317,11 +458,15 @@ def dashboard_data() -> dict[str, Any]:
         else None
     )
 
+    device = device_health()
     return {
         "latest": latest_dict,
         "telemetry_age_sec": telemetry_age_sec,
         "history": [dict(row) for row in reversed(history)],
         "events": [dict(row) for row in recent_events],
         "event_quality": quality,
-        "device": device_health(),
+        "device": device,
+        "alerts": evaluate_alerts(latest_dict, telemetry_age_sec, device, quality),
+        "window_minutes": window_minutes,
+        "retention_days": RETENTION_DAYS,
     }
