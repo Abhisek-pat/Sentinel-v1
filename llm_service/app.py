@@ -72,6 +72,12 @@ def list_providers() -> dict[str, Any]:
                 "name": name,
                 "model": provider.model,
                 "available": provider.available(),
+                "status": "ready" if provider.available() else "configuration_error",
+                "detail": (
+                    "Configuration is ready; endpoint reachability is verified on request."
+                    if provider.available()
+                    else provider.configuration_error()
+                ),
             }
             for name, provider in sorted(providers.items())
         ],

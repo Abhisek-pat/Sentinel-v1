@@ -113,7 +113,7 @@ class LlmServiceTest(unittest.TestCase):
                 {
                     "name": "hosted-a",
                     "type": "openai_compatible",
-                    "base_url": "https://example.invalid/v1",
+                    "base_url": "http://127.0.0.1:9999/v1",
                     "model": "model-a",
                     "api_key_env": "SENTINEL_TEST_API_KEY",
                 }
@@ -127,6 +127,22 @@ class LlmServiceTest(unittest.TestCase):
             configured = providers_module.create_providers()
         self.assertIn("hosted-a", configured)
         self.assertFalse(configured["hosted-a"].available())
+        self.assertIn("SENTINEL_TEST_API_KEY", configured["hosted-a"].configuration_error())
+
+    def test_documentation_placeholders_are_not_available(self) -> None:
+        provider = providers_module.OpenAiCompatibleProvider(
+            name="model-a",
+            base_url="http://MODEL-SERVER:PORT/v1",
+            model="MODEL-NAME",
+        )
+        self.assertFalse(provider.available())
+        self.assertIn("placeholder", provider.configuration_error())
+
+    def test_provider_discovery_explains_readiness(self) -> None:
+        result = app.list_providers()
+        mock = next(provider for provider in result["providers"] if provider["name"] == "mock")
+        self.assertEqual("ready", mock["status"])
+        self.assertIn("reachability", mock["detail"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -22,6 +23,9 @@ class ReasoningResult:
 class ReasoningProvider(Protocol):
     model: str
 
+    def configuration_error(self) -> str:
+        ...
+
     def available(self) -> bool:
         ...
 
@@ -31,6 +35,9 @@ class ReasoningProvider(Protocol):
 
 class MockProvider:
     model = "sentinel-rules-v1"
+
+    def configuration_error(self) -> str:
+        return ""
 
     def available(self) -> bool:
         return True
@@ -94,15 +101,40 @@ class OpenAiCompatibleProvider:
         self.api_key_env = api_key_env
         self.timeout_sec = timeout_sec
 
-    def available(self) -> bool:
-        return bool(self.base_url and self.model) and (
-            not self.api_key_env or bool(os.environ.get(self.api_key_env))
+    def configuration_error(self) -> str:
+        if not self.base_url:
+            return "base_url is missing."
+        if not self.model:
+            return "model is missing."
+
+        parsed_url = urllib.parse.urlparse(self.base_url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            return "base_url must be an HTTP or HTTPS endpoint."
+
+        placeholder_values = (
+            self.base_url.lower(),
+            self.model.lower(),
         )
+        placeholder_markers = (
+            "model-server",
+            "model-name",
+            "replace-me",
+            "example.invalid",
+        )
+        if any(marker in value for marker in placeholder_markers for value in placeholder_values):
+            return "profile still contains documentation placeholder values."
+
+        if self.api_key_env and not os.environ.get(self.api_key_env):
+            return f"required credential environment variable '{self.api_key_env}' is not set."
+        return ""
+
+    def available(self) -> bool:
+        return not self.configuration_error()
 
     def reason(self, scene_state: dict[str, Any]) -> ReasoningResult:
         if not self.available():
             raise ProviderError(
-                f"Provider '{self.name}' is unavailable. Check endpoint and credentials."
+                f"Provider '{self.name}' is unavailable: {self.configuration_error()}"
             )
 
         request_body = json.dumps(

@@ -106,6 +106,16 @@ Example profile value, kept on one line:
 SENTINEL_LLM_PROFILES_JSON='[{"name":"model-a","type":"openai_compatible","base_url":"http://192.168.1.20:11434/v1","model":"model-a","timeout_sec":60}]'
 ```
 
+Replace the example address and model name with a running model endpoint.
+`/providers` validates configuration and reports a readiness detail, but it
+does not contact the model server. Verify reachability with `/reason`:
+
+```bash
+curl -X POST http://127.0.0.1:8090/reason \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"model-a","scene_state":{"persons":[],"recent_events":[]}}'
+```
+
 Use `/benchmark` to run the same SceneState repeatedly against selected model
 profiles. Its comparison output includes success rate, latency statistics, and
 risk-level counts.
