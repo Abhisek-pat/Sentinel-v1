@@ -90,9 +90,25 @@ curl -X POST http://127.0.0.1:8090/reason \
   -d '{"scene_state":{"persons":[],"recent_events":[]}}'
 ```
 
-Use `/benchmark` to run the same SceneState repeatedly against selected
-providers. Real model adapters will be added after the mock contract and Pi
-service behavior are validated.
+Real model profiles are configured in `/etc/sentinel/llm.env`. Each profile
+targets an OpenAI-compatible `/v1/chat/completions` endpoint and can reference a
+separate API-key environment variable.
+
+```bash
+sudo nano /etc/sentinel/llm.env
+sudo systemctl restart sentinel-llm
+curl http://127.0.0.1:8090/providers
+```
+
+Example profile value, kept on one line:
+
+```text
+SENTINEL_LLM_PROFILES_JSON='[{"name":"model-a","type":"openai_compatible","base_url":"http://192.168.1.20:11434/v1","model":"model-a","timeout_sec":60}]'
+```
+
+Use `/benchmark` to run the same SceneState repeatedly against selected model
+profiles. Its comparison output includes success rate, latency statistics, and
+risk-level counts.
 
 ## First-Device Benchmark
 

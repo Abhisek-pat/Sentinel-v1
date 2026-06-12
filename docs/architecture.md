@@ -39,9 +39,14 @@ keys or network access. The service exposes:
 - `GET /health` for service readiness.
 
 Each successful response includes the summary, risk level, recommended action,
-provider, model, and request latency. Sentinel does not call this service from
-the real-time pipeline yet; the next integration increment will invoke it
-asynchronously so capture and inference cannot be blocked by model latency.
+provider, model, and request latency. OpenAI-compatible model profiles can be
+configured without changing application code. The benchmark endpoint returns
+individual runs plus per-model success rate, average/minimum/maximum latency,
+and risk-level counts.
+
+Sentinel does not call this service from the real-time pipeline yet; the next
+integration increment will invoke it asynchronously so capture and inference
+cannot be blocked by model latency.
 
 `src/reasoning/llm_client.*` is the earlier Windows-only synchronous prototype
 and remains outside the CMake target.

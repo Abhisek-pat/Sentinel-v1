@@ -1,4 +1,5 @@
 import os
+import statistics
 import time
 from typing import Any
 
@@ -103,7 +104,33 @@ def benchmark(request: BenchmarkRequest) -> dict[str, Any]:
                     }
                 )
 
+    comparisons: list[dict[str, Any]] = []
+    for provider_name in selected:
+        provider_runs = [run for run in runs if run["provider"] == provider_name]
+        successful_runs = [run for run in provider_runs if run.get("success")]
+        latencies = [float(run["latency_ms"]) for run in successful_runs]
+        risk_counts = {
+            risk: sum(run.get("risk_level") == risk for run in successful_runs)
+            for risk in ("low", "medium", "high")
+        }
+        comparisons.append(
+            {
+                "provider": provider_name,
+                "model": successful_runs[0]["model"] if successful_runs else None,
+                "runs": len(provider_runs),
+                "successes": len(successful_runs),
+                "success_rate_percent": round(
+                    len(successful_runs) / max(1, len(provider_runs)) * 100.0, 2
+                ),
+                "latency_avg_ms": round(statistics.mean(latencies), 2) if latencies else None,
+                "latency_min_ms": round(min(latencies), 2) if latencies else None,
+                "latency_max_ms": round(max(latencies), 2) if latencies else None,
+                "risk_counts": risk_counts,
+            }
+        )
+
     return {
         "scene_persons": len(request.scene_state.get("persons", [])),
         "runs": runs,
+        "comparisons": comparisons,
     }
