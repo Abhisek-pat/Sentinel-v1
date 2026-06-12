@@ -42,3 +42,7 @@ Thumbs.db
 data/clips/
 __pycache__/
 *.pyc
+*.db
+*.db-shm
+*.db-wal
+*.jsonl

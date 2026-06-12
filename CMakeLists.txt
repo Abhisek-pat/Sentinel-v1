@@ -72,6 +72,7 @@ add_executable(sentinel
 
     src/reasoning/scene_state.cpp
     src/recording/frame_ring_buffer.cpp
+    src/monitoring/kpi_writer.cpp
 
     src/ui/overlay_renderer.cpp
     src/utils/timer.cpp
@@ -123,6 +124,7 @@ endif()
 
 install(TARGETS sentinel RUNTIME DESTINATION bin)
 install(FILES models/yolo/model_320.onnx DESTINATION share/sentinel/models/yolo)
+install(DIRECTORY dashboard_service DESTINATION share/sentinel)
 
 include(CTest)
 

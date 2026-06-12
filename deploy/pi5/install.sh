@@ -17,7 +17,7 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
 fi
 
 apt-get update
-apt-get install -y build-essential ca-certificates cmake curl libopencv-dev
+apt-get install -y build-essential ca-certificates cmake curl libopencv-dev python3-venv
 
 if [[ ! -f /opt/onnxruntime/include/onnxruntime_cxx_api.h ]]; then
   temp_dir="$(mktemp -d)"
@@ -40,15 +40,25 @@ if ! id sentinel >/dev/null 2>&1; then
 fi
 
 install -d -o sentinel -g sentinel /var/lib/sentinel/clips
+install -d -o sentinel -g sentinel /var/lib/sentinel/kpi
+install -d -o sentinel -g sentinel /var/lib/sentinel/dashboard
 install -d -m 0750 /etc/sentinel
 if [[ ! -f /etc/sentinel/sentinel.env ]]; then
   install -m 0640 -o root -g sentinel "${ROOT_DIR}/deploy/pi5/sentinel.env" /etc/sentinel/sentinel.env
 fi
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel.service" /etc/systemd/system/sentinel.service
+install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-dashboard.service" /etc/systemd/system/sentinel-dashboard.service
+
+python3 -m venv /opt/sentinel/dashboard-venv
+/opt/sentinel/dashboard-venv/bin/pip install --upgrade pip
+/opt/sentinel/dashboard-venv/bin/pip install \
+  -r /opt/sentinel/share/sentinel/dashboard_service/requirements.txt
 
 systemctl daemon-reload
 systemctl enable sentinel.service
+systemctl enable sentinel-dashboard.service
 
 echo
 echo "Sentinel is installed but not started."
 echo "Edit /etc/sentinel/sentinel.env, then run: sudo systemctl start sentinel"
+echo "Start the KPI API with: sudo systemctl start sentinel-dashboard"

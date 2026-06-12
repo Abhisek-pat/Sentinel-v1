@@ -1,0 +1,33 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <fstream>
+#include <string>
+
+struct TelemetryKpi {
+    double capture_fps{0.0};
+    double detection_fps{0.0};
+    double preprocess_ms{0.0};
+    double inference_ms{0.0};
+    double postprocess_ms{0.0};
+    std::size_t persons{0};
+    std::uint64_t rtsp_reconnects{0};
+    std::int64_t last_frame_age_ms{-1};
+};
+
+class KpiWriter {
+public:
+    explicit KpiWriter(const std::string& directory);
+
+    bool enabled() const;
+    void writeTelemetry(const TelemetryKpi& telemetry);
+    void writeEvent(const std::string& category, const std::string& message);
+
+private:
+    static std::int64_t unixTimeMilliseconds();
+    static std::string escapeJson(const std::string& value);
+
+    std::ofstream telemetry_stream_;
+    std::ofstream event_stream_;
+};

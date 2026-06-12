@@ -3,6 +3,7 @@
 #include "capture/video_source.h"
 #include "detection/yolo_onnx.h"
 #include "events/event_engine.h"
+#include "monitoring/kpi_writer.h"
 #include "reasoning/scene_state.h"
 #include "recording/frame_ring_buffer.h"
 #include "tracking/tracker.h"
@@ -134,6 +135,8 @@ bool Pipeline::run() {
         environmentString("SENTINEL_MODEL_PATH", "models/yolo/model_320.onnx");
     const std::string clip_dir =
         environmentString("SENTINEL_CLIP_DIR", "data/clips");
+    const std::string kpi_dir =
+        environmentString("SENTINEL_KPI_DIR", "");
     const bool headless = environmentFlag("SENTINEL_HEADLESS", false);
     const int inference_interval =
         environmentInt("SENTINEL_INFERENCE_INTERVAL", SENTINEL_INFERENCE_INTERVAL, 1);
@@ -153,6 +156,8 @@ bool Pipeline::run() {
               << (max_clips > 0 ? std::to_string(max_clips) : "unlimited") << "\n";
     std::cout << "[Sentinel] Telemetry interval: " << telemetry_interval_sec << " second(s)\n";
     std::cout << "[Sentinel] SceneState interval: " << scene_interval_sec << " second(s)\n";
+    std::cout << "[Sentinel] KPI persistence: "
+              << (kpi_dir.empty() ? "disabled" : kpi_dir) << "\n";
 
     YoloOnnxDetector detector(model_path);
 
@@ -166,6 +171,7 @@ bool Pipeline::run() {
     ZoneManager zone_manager;
     SceneStateBuilder scene_state_builder;
     OverlayRenderer overlay_renderer;
+    KpiWriter kpi_writer(kpi_dir);
 
     cv::Mat frame;
     const std::string window_name = "Sentinel";
@@ -256,6 +262,7 @@ bool Pipeline::run() {
 
             for (const auto& event : frame_events) {
                 std::cout << event << "\n";
+                kpi_writer.writeEvent("scene", event);
 
                 if (isImportantForUi(event)) {
                     recent_events.push_back(event);
@@ -267,6 +274,7 @@ bool Pipeline::run() {
 
             for (const auto& zone_event : zone_events) {
                 std::cout << zone_event.message << "\n";
+                kpi_writer.writeEvent("zone", zone_event.message);
 
                 if (zone_event.message.find("loitering") != std::string::npos) {
                     should_save_event_clip = true;
@@ -288,6 +296,7 @@ bool Pipeline::run() {
                 if (clip_buffer.saveToVideo(output_path.string(), 10.0)) {
                     std::cout << "[Sentinel] Event clip saved: "
                               << output_path.string() << "\n";
+                    kpi_writer.writeEvent("clip", output_path.string());
                     enforceClipRetention(clip_dir, max_clips);
                 }
 
@@ -374,6 +383,17 @@ bool Pipeline::run() {
                       << " rtsp_reconnects=" << video_source.reconnectCount()
                       << " last_frame_age_ms=" << video_source.lastFrameAgeMilliseconds()
                       << "\n";
+
+            kpi_writer.writeTelemetry({
+                capture_fps,
+                detection_fps,
+                telemetry_inferences > 0 ? telemetry_preprocess_ms / inference_count : 0.0,
+                telemetry_inferences > 0 ? telemetry_inference_ms / inference_count : 0.0,
+                telemetry_inferences > 0 ? telemetry_postprocess_ms / inference_count : 0.0,
+                person_detections.size(),
+                video_source.reconnectCount(),
+                video_source.lastFrameAgeMilliseconds()
+            });
 
             telemetry_window_start_sec = telemetry_now_sec;
             telemetry_frames = 0;

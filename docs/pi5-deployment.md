@@ -50,6 +50,23 @@ sudo systemctl stop sentinel
 sudo bash deploy/pi5/diagnose.sh
 ```
 
+## KPI API
+
+The Pi installer deploys a lightweight FastAPI sidecar that ingests Sentinel's
+structured telemetry and event records into SQLite.
+
+```bash
+sudo systemctl start sentinel-dashboard
+sudo systemctl status sentinel-dashboard
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/api/kpis/latest
+curl http://127.0.0.1:8080/api/summary
+curl "http://127.0.0.1:8080/api/events?limit=20"
+```
+
+The current service listens on port 8080 for LAN testing. Authentication and
+secure remote access are scheduled before production exposure.
+
 ## First-Device Benchmark
 
 Run the real camera feed for at least 30 minutes. Watch logs, temperature,

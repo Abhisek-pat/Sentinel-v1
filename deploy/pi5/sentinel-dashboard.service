@@ -1,0 +1,21 @@
+[Unit]
+Description=Sentinel KPI API
+After=sentinel.service
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+Environment=SENTINEL_KPI_DIR=/var/lib/sentinel/kpi
+Environment=SENTINEL_KPI_DATABASE=/var/lib/sentinel/dashboard/kpi.db
+ExecStart=/opt/sentinel/dashboard-venv/bin/uvicorn app:app --app-dir /opt/sentinel/share/sentinel/dashboard_service --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sentinel
+
+[Install]
+WantedBy=multi-user.target
