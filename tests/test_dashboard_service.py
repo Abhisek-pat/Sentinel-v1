@@ -76,6 +76,45 @@ class DashboardReasoningTest(unittest.TestCase):
             )
             self.assertTrue(any(alert["code"] == "reasoning_backlog" for alert in alerts))
 
+    def test_evaluation_results_are_ingested(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kpi_dir = root / "kpi"
+            database_path = root / "dashboard" / "kpi.db"
+            kpi_dir.mkdir()
+            result = {
+                "evaluation_id": "evaluation-1",
+                "timestamp_ms": int(time.time() * 1000),
+                "label": "baseline",
+                "provider": "openai-cloud",
+                "model": "gpt-4.1-mini",
+                "cases": 5,
+                "iterations": 1,
+                "runs": 5,
+                "successes": 5,
+                "correct_risk": 5,
+                "success_rate_percent": 100.0,
+                "risk_accuracy_percent": 100.0,
+                "latency_avg_ms": 1143.11,
+                "latency_min_ms": 1037.64,
+                "latency_max_ms": 1324.29,
+            }
+            (kpi_dir / "evaluation_results.jsonl").write_text(
+                json.dumps(result) + "\n", encoding="utf-8"
+            )
+
+            with (
+                patch.object(app, "KPI_DIR", kpi_dir),
+                patch.object(app, "DATABASE_PATH", database_path),
+            ):
+                app.initialize_database()
+                counts = app.ingest()
+                rows = app.evaluation_results()
+
+            self.assertEqual(1, counts["evaluations"])
+            self.assertEqual("openai-cloud", rows[0]["provider"])
+            self.assertEqual(100.0, rows[0]["risk_accuracy_percent"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -139,7 +139,13 @@ OpenAI requests:
 ```bash
 curl -X POST http://127.0.0.1:8090/evaluate \
   -H "Content-Type: application/json" \
-  -d '{"providers":["mock","openai-cloud"],"iterations":1}'
+  -d '{"providers":["mock","openai-cloud"],"iterations":1,"label":"pi5-baseline"}'
+```
+
+Evaluation summaries persist in the dashboard and can be queried with:
+
+```bash
+curl "http://127.0.0.1:8080/api/evaluations?limit=20"
 ```
 
 Loitering events automatically queue an asynchronous reasoning request. The

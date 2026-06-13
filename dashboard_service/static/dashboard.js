@@ -117,6 +117,11 @@ function update(data) {
     return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(result.risk_level)}</td><td>${escapeHtml(provider)}</td><td>${number(result.latency_ms, 0)} ms</td><td>${escapeHtml(assessment)}</td></tr>`;
   });
   $("reasoning-table").innerHTML = reasoningRows.join("") || '<tr><td colspan="5">No reasoning results recorded</td></tr>';
+
+  const evaluationRows = (data.latest_evaluation || []).map((result) => {
+    return `<tr><td>${escapeHtml(result.provider)}</td><td>${escapeHtml(result.model || "--")}</td><td>${result.cases} x ${result.iterations}</td><td>${number(result.success_rate_percent, 1)}%</td><td>${number(result.risk_accuracy_percent, 1)}%</td><td>${number(result.latency_avg_ms, 0)} ms</td></tr>`;
+  });
+  $("evaluation-table").innerHTML = evaluationRows.join("") || '<tr><td colspan="6">No evaluation recorded</td></tr>';
   drawChart(data.history || []);
 }
 

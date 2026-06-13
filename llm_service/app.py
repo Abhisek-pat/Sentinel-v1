@@ -3,6 +3,7 @@ import os
 import threading
 import statistics
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ class BenchmarkRequest(BaseModel):
 class EvaluationRequest(BaseModel):
     providers: list[str] = Field(default_factory=list)
     iterations: int = Field(default=1, ge=1, le=5)
+    label: str = Field(default="", max_length=100)
 
 
 def result_payload(result: ReasoningResult, latency_ms: float) -> dict[str, Any]:
@@ -50,6 +52,7 @@ OFFSET_PATH = KPI_DIR / "reasoning_requests.offset"
 POLL_INTERVAL_SEC = max(0.2, float(os.environ.get("SENTINEL_REASONING_POLL_SEC", "1")))
 FALLBACK_PROVIDER = os.environ.get("SENTINEL_LLM_FALLBACK_PROVIDER", "mock")
 EVALUATION_CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
+EVALUATION_RESULTS_PATH = KPI_DIR / "evaluation_results.jsonl"
 worker_stop = threading.Event()
 worker_thread: threading.Thread | None = None
 
@@ -79,6 +82,26 @@ def load_evaluation_cases() -> list[dict[str, Any]]:
     if not isinstance(cases, list):
         raise HTTPException(status_code=500, detail="Evaluation cases must be a JSON array.")
     return cases
+
+
+def persist_evaluation(
+    evaluation_id: str,
+    timestamp_ms: int,
+    label: str,
+    iterations: int,
+    comparisons: list[dict[str, Any]],
+) -> None:
+    KPI_DIR.mkdir(parents=True, exist_ok=True)
+    with EVALUATION_RESULTS_PATH.open("a", encoding="utf-8") as output:
+        for comparison in comparisons:
+            record = {
+                "evaluation_id": evaluation_id,
+                "timestamp_ms": timestamp_ms,
+                "label": label,
+                "iterations": iterations,
+                **comparison,
+            }
+            output.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
 def process_reasoning_request(request: dict[str, Any]) -> dict[str, Any]:
@@ -340,7 +363,19 @@ def evaluate(request: EvaluationRequest) -> dict[str, Any]:
             }
         )
 
+    timestamp_ms = int(time.time() * 1000)
+    evaluation_id = f"{timestamp_ms}-{uuid.uuid4().hex[:8]}"
+    persist_evaluation(
+        evaluation_id,
+        timestamp_ms,
+        request.label.strip(),
+        request.iterations,
+        comparisons,
+    )
     return {
+        "evaluation_id": evaluation_id,
+        "timestamp_ms": timestamp_ms,
+        "label": request.label.strip(),
         "case_count": len(cases),
         "providers": selected,
         "iterations": request.iterations,

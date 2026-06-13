@@ -102,6 +102,25 @@ def initialize_database() -> None:
                 error TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS evaluation_results (
+                evaluation_id TEXT NOT NULL,
+                timestamp_ms INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT,
+                cases INTEGER NOT NULL,
+                iterations INTEGER NOT NULL,
+                runs INTEGER NOT NULL,
+                successes INTEGER NOT NULL,
+                correct_risk INTEGER NOT NULL,
+                success_rate_percent REAL NOT NULL,
+                risk_accuracy_percent REAL NOT NULL,
+                latency_avg_ms REAL,
+                latency_min_ms REAL,
+                latency_max_ms REAL,
+                PRIMARY KEY (evaluation_id, provider)
+            );
+
             CREATE TABLE IF NOT EXISTS ingestion_offsets (
                 path TEXT PRIMARY KEY,
                 offset_bytes INTEGER NOT NULL
@@ -246,7 +265,39 @@ def ingest() -> dict[str, int]:
             "error",
         ),
     )
-    return {"telemetry": telemetry_count, "events": event_count, "reasoning": reasoning_count}
+    evaluation_count = ingest_jsonl(
+        KPI_DIR / "evaluation_results.jsonl",
+        """
+        INSERT OR IGNORE INTO evaluation_results (
+            evaluation_id, timestamp_ms, label, provider, model, cases,
+            iterations, runs, successes, correct_risk, success_rate_percent,
+            risk_accuracy_percent, latency_avg_ms, latency_min_ms, latency_max_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "evaluation_id",
+            "timestamp_ms",
+            "label",
+            "provider",
+            "model",
+            "cases",
+            "iterations",
+            "runs",
+            "successes",
+            "correct_risk",
+            "success_rate_percent",
+            "risk_accuracy_percent",
+            "latency_avg_ms",
+            "latency_min_ms",
+            "latency_max_ms",
+        ),
+    )
+    return {
+        "telemetry": telemetry_count,
+        "events": event_count,
+        "reasoning": reasoning_count,
+        "evaluations": evaluation_count,
+    }
 
 
 def cleanup_retention() -> dict[str, int]:
@@ -261,10 +312,14 @@ def cleanup_retention() -> dict[str, int]:
         before = connection.total_changes
         connection.execute("DELETE FROM reasoning_results WHERE timestamp_ms < ?", (cutoff_ms,))
         reasoning_deleted = connection.total_changes - before
+        before = connection.total_changes
+        connection.execute("DELETE FROM evaluation_results WHERE timestamp_ms < ?", (cutoff_ms,))
+        evaluations_deleted = connection.total_changes - before
     return {
         "telemetry": telemetry_deleted,
         "events": events_deleted,
         "reasoning": reasoning_deleted,
+        "evaluations": evaluations_deleted,
     }
 
 
@@ -577,6 +632,22 @@ def reasoning_results(
     return [dict(row) for row in rows]
 
 
+@app.get("/api/evaluations")
+def evaluation_results(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+) -> list[dict[str, Any]]:
+    ingest()
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM evaluation_results
+            ORDER BY timestamp_ms DESC, provider ASC LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 @app.get("/api/summary")
 def summary(
     window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
@@ -662,6 +733,16 @@ def dashboard_data(
             """,
             (cutoff_ms,),
         ).fetchall()
+        latest_evaluation = connection.execute(
+            """
+            SELECT * FROM evaluation_results
+            WHERE evaluation_id = (
+                SELECT evaluation_id FROM evaluation_results
+                ORDER BY timestamp_ms DESC LIMIT 1
+            )
+            ORDER BY provider ASC
+            """
+        ).fetchall()
 
     latest_dict = dict(latest) if latest else {}
     latest_timestamp = latest_dict.get("timestamp_ms")
@@ -680,6 +761,7 @@ def dashboard_data(
         "event_quality": quality,
         "reasoning_results": [dict(row) for row in reasoning_results],
         "reasoning": reasoning,
+        "latest_evaluation": [dict(row) for row in latest_evaluation],
         "device": device,
         "alerts": evaluate_alerts(latest_dict, telemetry_age_sec, device, quality, reasoning),
         "window_minutes": window_minutes,

@@ -95,11 +95,29 @@ class LlmServiceTest(unittest.TestCase):
         self.assertEqual(["high", "low", "medium"], result["risk_levels"])
 
     def test_mock_provider_scores_full_evaluation_accuracy(self) -> None:
-        result = app.evaluate(app.EvaluationRequest(providers=["mock"], iterations=2))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with (
+                patch.object(app, "KPI_DIR", root),
+                patch.object(app, "EVALUATION_RESULTS_PATH", root / "evaluation_results.jsonl"),
+            ):
+                result = app.evaluate(
+                    app.EvaluationRequest(
+                        providers=["mock"], iterations=2, label="regression"
+                    )
+                )
+            persisted = [
+                json.loads(line)
+                for line in (root / "evaluation_results.jsonl").read_text(
+                    encoding="utf-8"
+                ).splitlines()
+            ]
         comparison = result["comparisons"][0]
         self.assertEqual(result["case_count"] * 2, result["total_requests"])
         self.assertEqual(100.0, comparison["success_rate_percent"])
         self.assertEqual(100.0, comparison["risk_accuracy_percent"])
+        self.assertEqual("regression", result["label"])
+        self.assertEqual(result["evaluation_id"], persisted[0]["evaluation_id"])
 
     def test_openai_compatible_provider_contract(self) -> None:
         server = ThreadingHTTPServer(("127.0.0.1", 0), CompatibleEndpointHandler)

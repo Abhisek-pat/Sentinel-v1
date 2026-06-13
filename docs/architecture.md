@@ -51,6 +51,11 @@ medium, and high-risk SceneStates. It reports provider availability, risk
 classification accuracy, and latency. Evaluation is always explicitly invoked
 and is never part of the live event-processing path.
 
+Compact per-provider evaluation summaries are appended to
+`evaluation_results.jsonl`, ingested into the dashboard SQLite database, and
+shown in the Model Evaluation section. Full per-case output remains in the
+explicit `/evaluate` response.
+
 Sentinel asynchronously queues a SceneState when loitering is detected. Queue
 writes occur inside the vision process, but provider requests run in a
 background worker owned by the reasoning sidecar. The worker persists its
