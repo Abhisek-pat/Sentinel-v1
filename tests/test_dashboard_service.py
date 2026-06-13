@@ -98,6 +98,9 @@ class DashboardReasoningTest(unittest.TestCase):
                 "latency_avg_ms": 1143.11,
                 "latency_min_ms": 1037.64,
                 "latency_max_ms": 1324.29,
+                "latency_p95_ms": 1324.29,
+                "per_risk_accuracy_json": "{\"low\":100.0,\"medium\":100.0,\"high\":100.0}",
+                "confusion_json": "{}",
             }
             (kpi_dir / "evaluation_results.jsonl").write_text(
                 json.dumps(result) + "\n", encoding="utf-8"
@@ -114,6 +117,7 @@ class DashboardReasoningTest(unittest.TestCase):
             self.assertEqual(1, counts["evaluations"])
             self.assertEqual("openai-cloud", rows[0]["provider"])
             self.assertEqual(100.0, rows[0]["risk_accuracy_percent"])
+            self.assertEqual(1324.29, rows[0]["latency_p95_ms"])
 
 
 if __name__ == "__main__":

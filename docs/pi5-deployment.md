@@ -133,7 +133,7 @@ curl -X POST http://127.0.0.1:8090/evaluate \
 
 Run cloud models only when intentionally benchmarking them. An evaluation
 creates `case_count * provider_count * iterations` requests. For example, the
-included five-case suite with `mock` and `openai-cloud` creates five paid
+included fifteen-case suite with `mock` and `openai-cloud` creates fifteen paid
 OpenAI requests:
 
 ```bash
@@ -220,3 +220,17 @@ stream resolution and clip buffering instead of increasing swap.
 The FP32 model is the compatibility-first baseline. After collecting Pi
 latency and detection-quality measurements, test an INT8 quantized model.
 Adopt it only if person detection remains reliable on representative footage.
+
+## Portfolio Completion Checklist
+
+Keep the final project scope limited to these remaining gates:
+
+1. Deploy the fifteen-case evaluation suite and record a labeled Pi baseline.
+2. Configure two additional model profiles and run one comparison iteration.
+3. Run a 24-hour Pi soak test and retain the KPI/evaluation outputs.
+4. Compare the current FP32 detector with one INT8 model.
+5. Add dashboard authentication before exposing it outside the trusted LAN.
+6. Capture the final architecture diagram, benchmark table, and demo video.
+
+The project is portfolio-ready when all six gates have evidence. Additional
+features should be deferred until after interview preparation begins.

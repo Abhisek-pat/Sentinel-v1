@@ -91,7 +91,7 @@ class LlmServiceTest(unittest.TestCase):
 
     def test_evaluation_cases_cover_all_risk_levels(self) -> None:
         result = app.evaluation_cases()
-        self.assertGreaterEqual(result["count"], 5)
+        self.assertEqual(15, result["count"])
         self.assertEqual(["high", "low", "medium"], result["risk_levels"])
 
     def test_mock_provider_scores_full_evaluation_accuracy(self) -> None:
@@ -116,6 +116,11 @@ class LlmServiceTest(unittest.TestCase):
         self.assertEqual(result["case_count"] * 2, result["total_requests"])
         self.assertEqual(100.0, comparison["success_rate_percent"])
         self.assertEqual(100.0, comparison["risk_accuracy_percent"])
+        self.assertEqual(
+            {"low": 100.0, "medium": 100.0, "high": 100.0},
+            comparison["per_risk_accuracy"],
+        )
+        self.assertIsNotNone(comparison["latency_p95_ms"])
         self.assertEqual("regression", result["label"])
         self.assertEqual(result["evaluation_id"], persisted[0]["evaluation_id"])
 

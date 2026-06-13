@@ -40,6 +40,11 @@ JSONL_MAX_BYTES = max(
     1024 * 1024,
     int(os.environ.get("SENTINEL_KPI_JSONL_MAX_MB", "25")) * 1024 * 1024,
 )
+OPTIONAL_JSONL_FIELDS: dict[str, Any] = {
+    "latency_p95_ms": None,
+    "per_risk_accuracy_json": "{}",
+    "confusion_json": "{}",
+}
 
 app = FastAPI(title="Sentinel KPI API")
 STATIC_DIR = Path(__file__).parent / "static"
@@ -118,6 +123,9 @@ def initialize_database() -> None:
                 latency_avg_ms REAL,
                 latency_min_ms REAL,
                 latency_max_ms REAL,
+                latency_p95_ms REAL,
+                per_risk_accuracy_json TEXT NOT NULL DEFAULT '{}',
+                confusion_json TEXT NOT NULL DEFAULT '{}',
                 PRIMARY KEY (evaluation_id, provider)
             );
 
@@ -151,6 +159,18 @@ def initialize_database() -> None:
                 connection.execute(
                     f"ALTER TABLE reasoning_results ADD COLUMN {name} {definition}"
                 )
+        evaluation_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(evaluation_results)")
+        }
+        for name, definition in (
+            ("latency_p95_ms", "REAL"),
+            ("per_risk_accuracy_json", "TEXT NOT NULL DEFAULT '{}'"),
+            ("confusion_json", "TEXT NOT NULL DEFAULT '{}'"),
+        ):
+            if name not in evaluation_columns:
+                connection.execute(
+                    f"ALTER TABLE evaluation_results ADD COLUMN {name} {definition}"
+                )
 
 
 def ingest_jsonl(path: Path, insert_sql: str, fields: tuple[str, ...]) -> int:
@@ -173,7 +193,14 @@ def ingest_jsonl(path: Path, insert_sql: str, fields: tuple[str, ...]) -> int:
         for line in source:
             try:
                 record = json.loads(line)
-                rows.append(tuple(record[field] for field in fields))
+                rows.append(
+                    tuple(
+                        record.get(field, OPTIONAL_JSONL_FIELDS[field])
+                        if field in OPTIONAL_JSONL_FIELDS
+                        else record[field]
+                        for field in fields
+                    )
+                )
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
         new_offset = source.tell()
@@ -271,8 +298,9 @@ def ingest() -> dict[str, int]:
         INSERT OR IGNORE INTO evaluation_results (
             evaluation_id, timestamp_ms, label, provider, model, cases,
             iterations, runs, successes, correct_risk, success_rate_percent,
-            risk_accuracy_percent, latency_avg_ms, latency_min_ms, latency_max_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            risk_accuracy_percent, latency_avg_ms, latency_min_ms, latency_max_ms,
+            latency_p95_ms, per_risk_accuracy_json, confusion_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "evaluation_id",
@@ -290,6 +318,9 @@ def ingest() -> dict[str, int]:
             "latency_avg_ms",
             "latency_min_ms",
             "latency_max_ms",
+            "latency_p95_ms",
+            "per_risk_accuracy_json",
+            "confusion_json",
         ),
     )
     return {

@@ -3,25 +3,46 @@
     "id": "empty-scene",
     "description": "No people or recent security events.",
     "expected_risk": "low",
-    "scene_state": {
-      "persons": [],
-      "recent_events": []
-    }
+    "scene_state": {"persons": [], "recent_events": []}
   },
   {
     "id": "person-present",
     "description": "A person is present without loitering or a security event.",
     "expected_risk": "low",
     "scene_state": {
+      "persons": [{"track_id": 1, "loitering": false}],
+      "recent_events": ["[Event] Track 1 (person) entered scene"]
+    }
+  },
+  {
+    "id": "normal-zone-transition",
+    "description": "A person moves between monitored zones normally.",
+    "expected_risk": "low",
+    "scene_state": {
+      "persons": [{"track_id": 2, "zone": "LEFT_ZONE", "dwell_time_sec": 3.2, "loitering": false}],
+      "recent_events": ["[Zone] Track 2 entered LEFT_ZONE"]
+    }
+  },
+  {
+    "id": "multiple-people-normal",
+    "description": "Three people are present without concerning behavior.",
+    "expected_risk": "low",
+    "scene_state": {
       "persons": [
-        {
-          "track_id": 1,
-          "loitering": false
-        }
+        {"track_id": 3, "zone": "LEFT_ZONE", "loitering": false},
+        {"track_id": 4, "zone": "CENTER_ZONE", "loitering": false},
+        {"track_id": 5, "zone": "RIGHT_ZONE", "loitering": false}
       ],
-      "recent_events": [
-        "[Event] Track 1 (person) entered scene"
-      ]
+      "recent_events": []
+    }
+  },
+  {
+    "id": "person-exited",
+    "description": "A person has exited after a short normal visit.",
+    "expected_risk": "low",
+    "scene_state": {
+      "persons": [],
+      "recent_events": ["[Event] Track 6 (person) exited scene after 8.4s"]
     }
   },
   {
@@ -29,17 +50,8 @@
     "description": "One person is loitering in the center zone.",
     "expected_risk": "medium",
     "scene_state": {
-      "persons": [
-        {
-          "track_id": 7,
-          "zone": "CENTER_ZONE",
-          "dwell_time_sec": 14.2,
-          "loitering": true
-        }
-      ],
-      "recent_events": [
-        "[Zone] Track 7 loitering in CENTER_ZONE for 14.2s"
-      ]
+      "persons": [{"track_id": 7, "zone": "CENTER_ZONE", "dwell_time_sec": 14.2, "loitering": true}],
+      "recent_events": ["[Zone] Track 7 loitering in CENTER_ZONE for 14.2s"]
     }
   },
   {
@@ -48,22 +60,41 @@
     "expected_risk": "medium",
     "scene_state": {
       "persons": [
-        {
-          "track_id": 8,
-          "zone": "CENTER_ZONE",
-          "dwell_time_sec": 18.5,
-          "loitering": true
-        },
-        {
-          "track_id": 9,
-          "zone": "CENTER_ZONE",
-          "dwell_time_sec": 3.1,
-          "loitering": false
-        }
+        {"track_id": 8, "zone": "CENTER_ZONE", "dwell_time_sec": 18.5, "loitering": true},
+        {"track_id": 9, "zone": "CENTER_ZONE", "dwell_time_sec": 3.1, "loitering": false}
       ],
-      "recent_events": [
-        "[Zone] Track 8 loitering in CENTER_ZONE for 18.5s"
-      ]
+      "recent_events": ["[Zone] Track 8 loitering in CENTER_ZONE for 18.5s"]
+    }
+  },
+  {
+    "id": "left-zone-loitering",
+    "description": "A person is loitering in the left zone.",
+    "expected_risk": "medium",
+    "scene_state": {
+      "persons": [{"track_id": 10, "zone": "LEFT_ZONE", "dwell_time_sec": 24.0, "loitering": true}],
+      "recent_events": ["[Zone] Track 10 loitering in LEFT_ZONE for 24.0s"]
+    }
+  },
+  {
+    "id": "loitering-with-bystanders",
+    "description": "One loitering person is surrounded by normal tracks.",
+    "expected_risk": "medium",
+    "scene_state": {
+      "persons": [
+        {"track_id": 11, "zone": "CENTER_ZONE", "loitering": false},
+        {"track_id": 12, "zone": "CENTER_ZONE", "dwell_time_sec": 30.0, "loitering": true},
+        {"track_id": 13, "zone": "LEFT_ZONE", "loitering": false}
+      ],
+      "recent_events": []
+    }
+  },
+  {
+    "id": "loitering-after-zone-transition",
+    "description": "A track starts loitering after moving into a new zone.",
+    "expected_risk": "medium",
+    "scene_state": {
+      "persons": [{"track_id": 14, "zone": "CENTER_ZONE", "dwell_time_sec": 11.0, "loitering": true}],
+      "recent_events": ["[Zone] Track 14 entered CENTER_ZONE"]
     }
   },
   {
@@ -71,15 +102,47 @@
     "description": "A forced-entry emergency was reported.",
     "expected_risk": "high",
     "scene_state": {
+      "persons": [{"track_id": 15, "loitering": false}],
+      "recent_events": ["Emergency forced entry reported"]
+    }
+  },
+  {
+    "id": "weapon-reported",
+    "description": "A weapon-related event was reported.",
+    "expected_risk": "high",
+    "scene_state": {
+      "persons": [{"track_id": 16, "zone": "CENTER_ZONE", "loitering": false}],
+      "recent_events": ["Weapon detected near Track 16"]
+    }
+  },
+  {
+    "id": "intrusion-reported",
+    "description": "An intrusion event was reported.",
+    "expected_risk": "high",
+    "scene_state": {
+      "persons": [{"track_id": 17, "zone": "LEFT_ZONE", "loitering": false}],
+      "recent_events": ["Intrusion detected in restricted area"]
+    }
+  },
+  {
+    "id": "emergency-with-multiple-people",
+    "description": "An emergency occurs while multiple people are visible.",
+    "expected_risk": "high",
+    "scene_state": {
       "persons": [
-        {
-          "track_id": 12,
-          "loitering": false
-        }
+        {"track_id": 18, "zone": "CENTER_ZONE", "loitering": false},
+        {"track_id": 19, "zone": "LEFT_ZONE", "loitering": false}
       ],
-      "recent_events": [
-        "Emergency forced entry reported"
-      ]
+      "recent_events": ["Emergency alarm activated"]
+    }
+  },
+  {
+    "id": "forced-entry-with-loitering",
+    "description": "A forced-entry report takes precedence over loitering.",
+    "expected_risk": "high",
+    "scene_state": {
+      "persons": [{"track_id": 20, "zone": "CENTER_ZONE", "dwell_time_sec": 40.0, "loitering": true}],
+      "recent_events": ["Forced entry detected at monitored access point"]
     }
   }
 ]

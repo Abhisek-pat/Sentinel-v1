@@ -100,8 +100,22 @@ def persist_evaluation(
                 "label": label,
                 "iterations": iterations,
                 **comparison,
+                "per_risk_accuracy_json": json.dumps(
+                    comparison["per_risk_accuracy"], separators=(",", ":")
+                ),
+                "confusion_json": json.dumps(
+                    comparison["confusion"], separators=(",", ":")
+                ),
             }
             output.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+
+def percentile(values: list[float], percent: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, int((len(ordered) * percent) + 0.999999) - 1))
+    return ordered[index]
 
 
 def process_reasoning_request(request: dict[str, Any]) -> dict[str, Any]:
@@ -340,6 +354,26 @@ def evaluate(request: EvaluationRequest) -> dict[str, Any]:
         provider_runs = [run for run in runs if run["provider"] == provider_name]
         successful_runs = [run for run in provider_runs if run.get("success")]
         latencies = [float(run["latency_ms"]) for run in successful_runs]
+        per_risk_accuracy: dict[str, float | None] = {}
+        confusion: dict[str, dict[str, int]] = {}
+        for risk in ("low", "medium", "high"):
+            risk_runs = [run for run in provider_runs if run["expected_risk"] == risk]
+            per_risk_accuracy[risk] = (
+                round(
+                    sum(bool(run.get("correct_risk")) for run in risk_runs)
+                    / len(risk_runs)
+                    * 100.0,
+                    2,
+                )
+                if risk_runs
+                else None
+            )
+            confusion[risk] = {
+                observed: sum(
+                    run.get("risk_level", "unknown") == observed for run in risk_runs
+                )
+                for observed in ("low", "medium", "high", "unknown")
+            }
         comparisons.append(
             {
                 "provider": provider_name,
@@ -360,6 +394,9 @@ def evaluate(request: EvaluationRequest) -> dict[str, Any]:
                 "latency_avg_ms": round(statistics.mean(latencies), 2) if latencies else None,
                 "latency_min_ms": round(min(latencies), 2) if latencies else None,
                 "latency_max_ms": round(max(latencies), 2) if latencies else None,
+                "latency_p95_ms": round(percentile(latencies, 0.95), 2) if latencies else None,
+                "per_risk_accuracy": per_risk_accuracy,
+                "confusion": confusion,
             }
         )
 

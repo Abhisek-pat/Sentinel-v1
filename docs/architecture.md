@@ -56,6 +56,10 @@ Compact per-provider evaluation summaries are appended to
 shown in the Model Evaluation section. Full per-case output remains in the
 explicit `/evaluate` response.
 
+The balanced evaluation suite contains fifteen labeled cases: five each for
+low, medium, and high risk. Comparisons include overall and per-risk accuracy,
+a risk confusion matrix, success rate, and average/minimum/maximum/p95 latency.
+
 Sentinel asynchronously queues a SceneState when loitering is detected. Queue
 writes occur inside the vision process, but provider requests run in a
 background worker owned by the reasoning sidecar. The worker persists its
