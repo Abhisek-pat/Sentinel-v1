@@ -64,6 +64,8 @@ python3 -m venv /opt/sentinel/llm-venv
   -r /opt/sentinel/share/sentinel/llm_service/requirements.txt
 /opt/sentinel/llm-venv/bin/python -m unittest discover \
   -s "${ROOT_DIR}/tests" -p test_llm_service.py -v
+/opt/sentinel/dashboard-venv/bin/python -m unittest discover \
+  -s "${ROOT_DIR}/tests" -p test_dashboard_service.py -v
 
 systemctl daemon-reload
 systemctl enable sentinel.service

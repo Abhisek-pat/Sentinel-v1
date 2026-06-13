@@ -32,6 +32,10 @@ ALERT_SHORT_ZONE_EXIT_RATIO_MAX = float(
 ALERT_TELEMETRY_AGE_SEC_MAX = float(
     os.environ.get("SENTINEL_ALERT_TELEMETRY_AGE_SEC_MAX", "90")
 )
+ALERT_REASONING_PENDING_MAX = int(os.environ.get("SENTINEL_ALERT_REASONING_PENDING_MAX", "3"))
+ALERT_REASONING_FAILURE_RATIO_MAX = float(
+    os.environ.get("SENTINEL_ALERT_REASONING_FAILURE_RATIO_MAX", "0.25")
+)
 JSONL_MAX_BYTES = max(
     1024 * 1024,
     int(os.environ.get("SENTINEL_KPI_JSONL_MAX_MB", "25")) * 1024 * 1024,
@@ -372,11 +376,59 @@ def event_quality(connection: sqlite3.Connection, cutoff_ms: int) -> dict[str, A
     }
 
 
+def reasoning_health(connection: sqlite3.Connection, cutoff_ms: int) -> dict[str, Any]:
+    aggregate = connection.execute(
+        """
+        SELECT
+            COUNT(*) AS requests,
+            SUM(success) AS successes,
+            SUM(fallback_used) AS fallbacks,
+            AVG(CASE WHEN success THEN latency_ms END) AS latency_ms_avg,
+            MAX(CASE WHEN success THEN latency_ms END) AS latency_ms_max
+        FROM reasoning_results WHERE timestamp_ms >= ?
+        """,
+        (cutoff_ms,),
+    ).fetchone()
+    providers = connection.execute(
+        """
+        SELECT provider, model, COUNT(*) AS requests,
+               SUM(success) AS successes, AVG(latency_ms) AS latency_ms_avg
+        FROM reasoning_results WHERE timestamp_ms >= ?
+        GROUP BY provider, model ORDER BY requests DESC
+        """,
+        (cutoff_ms,),
+    ).fetchall()
+
+    request_path = KPI_DIR / "reasoning_requests.jsonl"
+    offset_path = KPI_DIR / "reasoning_requests.offset"
+    pending = 0
+    if request_path.exists():
+        try:
+            offset = int(offset_path.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            offset = 0
+        try:
+            with request_path.open("r", encoding="utf-8") as source:
+                source.seek(min(offset, request_path.stat().st_size))
+                pending = sum(1 for line in source if line.strip())
+        except OSError:
+            pending = 0
+
+    result = dict(aggregate)
+    requests = result.get("requests", 0) or 0
+    successes = result.get("successes", 0) or 0
+    result["success_rate_percent"] = round(successes / requests * 100.0, 1) if requests else None
+    result["pending"] = pending
+    result["providers"] = [dict(row) for row in providers]
+    return result
+
+
 def evaluate_alerts(
     latest: dict[str, Any],
     telemetry_age_sec: float | None,
     device: dict[str, Any],
     quality: dict[str, Any],
+    reasoning: dict[str, Any],
 ) -> list[dict[str, str]]:
     alerts: list[dict[str, str]] = []
 
@@ -425,6 +477,12 @@ def evaluate_alerts(
     short_exits = quality.get("short_zone_exits", 0)
     if tracks >= 5 and short_exits / tracks > ALERT_SHORT_ZONE_EXIT_RATIO_MAX:
         add("zone_jitter", "warning", "Short zone exits indicate excessive boundary jitter.")
+    if reasoning.get("pending", 0) > ALERT_REASONING_PENDING_MAX:
+        add("reasoning_backlog", "warning", "Reasoning request backlog is above the configured limit.")
+    requests = reasoning.get("requests", 0) or 0
+    successes = reasoning.get("successes", 0) or 0
+    if requests >= 3 and (requests - successes) / requests > ALERT_REASONING_FAILURE_RATIO_MAX:
+        add("reasoning_failures", "warning", "Reasoning request failure rate is above the configured limit.")
     return alerts
 
 
@@ -561,22 +619,12 @@ def summary(
             (cutoff_ms,),
         ).fetchall()
         quality = event_quality(connection, cutoff_ms)
-        reasoning = connection.execute(
-            """
-            SELECT
-                COUNT(*) AS requests,
-                SUM(success) AS successes,
-                AVG(latency_ms) AS latency_ms_avg,
-                SUM(fallback_used) AS fallbacks
-            FROM reasoning_results WHERE timestamp_ms >= ?
-            """,
-            (cutoff_ms,),
-        ).fetchone()
+        reasoning = reasoning_health(connection, cutoff_ms)
 
     result = dict(telemetry)
     result["events"] = {row["category"]: row["count"] for row in categories}
     result["event_quality"] = quality
-    result["reasoning"] = dict(reasoning)
+    result["reasoning"] = reasoning
     return result
 
 
@@ -606,6 +654,7 @@ def dashboard_data(
             (cutoff_ms,),
         ).fetchall()
         quality = event_quality(connection, cutoff_ms)
+        reasoning = reasoning_health(connection, cutoff_ms)
         reasoning_results = connection.execute(
             """
             SELECT * FROM reasoning_results WHERE timestamp_ms >= ?
@@ -630,8 +679,9 @@ def dashboard_data(
         "events": [dict(row) for row in recent_events],
         "event_quality": quality,
         "reasoning_results": [dict(row) for row in reasoning_results],
+        "reasoning": reasoning,
         "device": device,
-        "alerts": evaluate_alerts(latest_dict, telemetry_age_sec, device, quality),
+        "alerts": evaluate_alerts(latest_dict, telemetry_age_sec, device, quality, reasoning),
         "window_minutes": window_minutes,
         "retention_days": RETENTION_DAYS,
     }

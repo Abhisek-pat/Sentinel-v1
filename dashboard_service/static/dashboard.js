@@ -83,6 +83,12 @@ function update(data) {
   $("short-exits").textContent = quality.short_zone_exits ?? "--";
   $("loitering").textContent = quality.loitering_events ?? "--";
   $("clips").textContent = quality.clip_events ?? "--";
+  const reasoning = data.reasoning || {};
+  $("reasoning-requests").textContent = reasoning.requests ?? "--";
+  $("reasoning-success").textContent = reasoning.success_rate_percent == null ? "--" : `${number(reasoning.success_rate_percent, 1)}%`;
+  $("reasoning-fallbacks").textContent = reasoning.fallbacks ?? "--";
+  $("reasoning-latency").textContent = reasoning.latency_ms_avg == null ? "--" : `${number(reasoning.latency_ms_avg, 0)} ms`;
+  $("reasoning-pending").textContent = reasoning.pending ?? "--";
 
   const alerts = data.alerts || [];
   const critical = alerts.some((alert) => alert.severity === "critical");

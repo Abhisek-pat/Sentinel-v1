@@ -51,6 +51,10 @@ queue offset, falls back to `mock` when the selected provider fails, and writes
 results for dashboard ingestion. Provider latency cannot block capture or
 inference.
 
+The dashboard summarizes reasoning request count, success rate, fallback use,
+latency, provider/model usage, and pending queue depth. It alerts when requests
+are failing repeatedly or the asynchronous queue is backing up.
+
 `src/reasoning/llm_client.*` is the earlier Windows-only synchronous prototype
 and remains outside the CMake target.
 
