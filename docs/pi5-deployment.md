@@ -234,3 +234,29 @@ Keep the final project scope limited to these remaining gates:
 
 The project is portfolio-ready when all six gates have evidence. Additional
 features should be deferred until after interview preparation begins.
+
+Run the automated soak test from the repository:
+
+```bash
+mkdir -p ~/sentinel-reports
+python3 deploy/pi5/soak_test.py \
+  --duration-hours 24 \
+  --interval-sec 60 \
+  --output ~/sentinel-reports/pi5-24h-soak.json
+```
+
+For a quick deployment check before the full run:
+
+```bash
+python3 deploy/pi5/soak_test.py --samples 5 --interval-sec 2
+```
+
+The report records API availability, capture and inference performance,
+temperature, throttling, reconnect growth, reasoning backlog, alerts, memory,
+and storage. It exits successfully only when every acceptance gate passes.
+
+Generate a comprehensive diagnostic capture at any time with:
+
+```bash
+sudo bash deploy/pi5/diagnose.sh | tee ~/sentinel-reports/diagnostics.txt
+```
