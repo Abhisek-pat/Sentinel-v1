@@ -80,6 +80,24 @@ def initialize_database() -> None:
                 UNIQUE(timestamp_ms, category, message)
             );
 
+            CREATE TABLE IF NOT EXISTS reasoning_results (
+                request_id TEXT PRIMARY KEY,
+                request_timestamp_ms INTEGER NOT NULL,
+                timestamp_ms INTEGER NOT NULL,
+                trigger TEXT NOT NULL,
+                requested_provider TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                recommended_action TEXT NOT NULL,
+                latency_ms REAL NOT NULL,
+                success INTEGER NOT NULL,
+                fallback_used INTEGER NOT NULL,
+                primary_error TEXT NOT NULL,
+                error TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS ingestion_offsets (
                 path TEXT PRIMARY KEY,
                 offset_bytes INTEGER NOT NULL
@@ -99,6 +117,17 @@ def initialize_database() -> None:
         ):
             if name not in telemetry_columns:
                 connection.execute(f"ALTER TABLE telemetry ADD COLUMN {name} {definition}")
+        reasoning_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(reasoning_results)")
+        }
+        for name, definition in (
+            ("success", "INTEGER NOT NULL DEFAULT 1"),
+            ("error", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if name not in reasoning_columns:
+                connection.execute(
+                    f"ALTER TABLE reasoning_results ADD COLUMN {name} {definition}"
+                )
 
 
 def ingest_jsonl(path: Path, insert_sql: str, fields: tuple[str, ...]) -> int:
@@ -185,7 +214,35 @@ def ingest() -> dict[str, int]:
         "INSERT OR IGNORE INTO events (timestamp_ms, category, message) VALUES (?, ?, ?)",
         ("timestamp_ms", "category", "message"),
     )
-    return {"telemetry": telemetry_count, "events": event_count}
+    reasoning_count = ingest_jsonl(
+        KPI_DIR / "reasoning_results.jsonl",
+        """
+        INSERT OR IGNORE INTO reasoning_results (
+            request_id, request_timestamp_ms, timestamp_ms, trigger,
+            requested_provider, provider, model, risk_level, summary,
+            recommended_action, latency_ms, fallback_used, primary_error
+            , success, error
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "request_id",
+            "request_timestamp_ms",
+            "timestamp_ms",
+            "trigger",
+            "requested_provider",
+            "provider",
+            "model",
+            "risk_level",
+            "summary",
+            "recommended_action",
+            "latency_ms",
+            "fallback_used",
+            "primary_error",
+            "success",
+            "error",
+        ),
+    )
+    return {"telemetry": telemetry_count, "events": event_count, "reasoning": reasoning_count}
 
 
 def cleanup_retention() -> dict[str, int]:
@@ -197,7 +254,14 @@ def cleanup_retention() -> dict[str, int]:
         before = connection.total_changes
         connection.execute("DELETE FROM events WHERE timestamp_ms < ?", (cutoff_ms,))
         events_deleted = connection.total_changes - before
-    return {"telemetry": telemetry_deleted, "events": events_deleted}
+        before = connection.total_changes
+        connection.execute("DELETE FROM reasoning_results WHERE timestamp_ms < ?", (cutoff_ms,))
+        reasoning_deleted = connection.total_changes - before
+    return {
+        "telemetry": telemetry_deleted,
+        "events": events_deleted,
+        "reasoning": reasoning_deleted,
+    }
 
 
 def window_cutoff_ms(window_minutes: int) -> int:
@@ -438,6 +502,23 @@ def events(
     return [dict(row) for row in rows]
 
 
+@app.get("/api/reasoning")
+def reasoning_results(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
+) -> list[dict[str, Any]]:
+    ingest()
+    with connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM reasoning_results WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC LIMIT ?
+            """,
+            (window_cutoff_ms(window_minutes), limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 @app.get("/api/summary")
 def summary(
     window_minutes: Annotated[int, Query(ge=5, le=10080)] = 60,
@@ -480,10 +561,22 @@ def summary(
             (cutoff_ms,),
         ).fetchall()
         quality = event_quality(connection, cutoff_ms)
+        reasoning = connection.execute(
+            """
+            SELECT
+                COUNT(*) AS requests,
+                SUM(success) AS successes,
+                AVG(latency_ms) AS latency_ms_avg,
+                SUM(fallback_used) AS fallbacks
+            FROM reasoning_results WHERE timestamp_ms >= ?
+            """,
+            (cutoff_ms,),
+        ).fetchone()
 
     result = dict(telemetry)
     result["events"] = {row["category"]: row["count"] for row in categories}
     result["event_quality"] = quality
+    result["reasoning"] = dict(reasoning)
     return result
 
 
@@ -513,6 +606,13 @@ def dashboard_data(
             (cutoff_ms,),
         ).fetchall()
         quality = event_quality(connection, cutoff_ms)
+        reasoning_results = connection.execute(
+            """
+            SELECT * FROM reasoning_results WHERE timestamp_ms >= ?
+            ORDER BY timestamp_ms DESC LIMIT 20
+            """,
+            (cutoff_ms,),
+        ).fetchall()
 
     latest_dict = dict(latest) if latest else {}
     latest_timestamp = latest_dict.get("timestamp_ms")
@@ -529,6 +629,7 @@ def dashboard_data(
         "history": [dict(row) for row in reversed(history)],
         "events": [dict(row) for row in recent_events],
         "event_quality": quality,
+        "reasoning_results": [dict(row) for row in reasoning_results],
         "device": device,
         "alerts": evaluate_alerts(latest_dict, telemetry_age_sec, device, quality),
         "window_minutes": window_minutes,

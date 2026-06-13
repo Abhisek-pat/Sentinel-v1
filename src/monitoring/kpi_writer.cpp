@@ -25,6 +25,9 @@ KpiWriter::KpiWriter(const std::string& directory) {
     event_stream_.open(
         std::filesystem::path(directory) / "events.jsonl",
         std::ios::app);
+    reasoning_request_stream_.open(
+        std::filesystem::path(directory) / "reasoning_requests.jsonl",
+        std::ios::app);
 
     if (!enabled()) {
         std::cerr << "[KPI] Could not open KPI output files under "
@@ -71,6 +74,29 @@ void KpiWriter::writeEvent(const std::string& category, const std::string& messa
                   << "\",\"message\":\"" << escapeJson(message)
                   << "\"}\n";
     event_stream_.flush();
+}
+
+void KpiWriter::writeReasoningRequest(const std::string& trigger,
+                                      const std::string& scene_state_json) {
+    if (!reasoning_request_stream_.is_open()) {
+        return;
+    }
+
+    std::string compact_scene_state;
+    compact_scene_state.reserve(scene_state_json.size());
+    for (const char character : scene_state_json) {
+        if (character != '\n' && character != '\r') {
+            compact_scene_state.push_back(character);
+        }
+    }
+
+    const std::int64_t timestamp_ms = unixTimeMilliseconds();
+    reasoning_request_stream_ << "{\"request_id\":\"" << timestamp_ms
+                              << "\",\"timestamp_ms\":" << timestamp_ms
+                              << ",\"trigger\":\"" << escapeJson(trigger)
+                              << "\",\"scene_state\":" << compact_scene_state
+                              << "}\n";
+    reasoning_request_stream_.flush();
 }
 
 std::int64_t KpiWriter::unixTimeMilliseconds() {

@@ -103,6 +103,14 @@ function update(data) {
     return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(event.category)}</td><td>${escapeHtml(event.message)}</td></tr>`;
   });
   $("events-table").innerHTML = rows.join("") || '<tr><td colspan="3">No events recorded</td></tr>';
+
+  const reasoningRows = (data.reasoning_results || []).map((result) => {
+    const time = new Date(result.timestamp_ms).toLocaleTimeString();
+    const provider = `${result.provider}/${result.model || "--"}${result.fallback_used ? " (fallback)" : ""}`;
+    const assessment = result.success ? `${result.summary} ${result.recommended_action}` : `Failed: ${result.error || result.primary_error}`;
+    return `<tr><td>${escapeHtml(time)}</td><td>${escapeHtml(result.risk_level)}</td><td>${escapeHtml(provider)}</td><td>${number(result.latency_ms, 0)} ms</td><td>${escapeHtml(assessment)}</td></tr>`;
+  });
+  $("reasoning-table").innerHTML = reasoningRows.join("") || '<tr><td colspan="5">No reasoning results recorded</td></tr>';
   drawChart(data.history || []);
 }
 

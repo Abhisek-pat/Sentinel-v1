@@ -148,6 +148,8 @@ bool Pipeline::run() {
         environmentInt("SENTINEL_TELEMETRY_INTERVAL_SEC", 30, 1);
     const int scene_interval_sec =
         environmentInt("SENTINEL_SCENE_INTERVAL_SEC", 5, 1);
+    const int reasoning_cooldown_sec =
+        environmentInt("SENTINEL_REASONING_COOLDOWN_SEC", 60, 1);
 
     std::cout << "[Sentinel] Headless mode: " << (headless ? "enabled" : "disabled") << "\n";
     std::cout << "[Sentinel] Inference interval: every " << inference_interval << " frame(s)\n";
@@ -156,6 +158,7 @@ bool Pipeline::run() {
               << (max_clips > 0 ? std::to_string(max_clips) : "unlimited") << "\n";
     std::cout << "[Sentinel] Telemetry interval: " << telemetry_interval_sec << " second(s)\n";
     std::cout << "[Sentinel] SceneState interval: " << scene_interval_sec << " second(s)\n";
+    std::cout << "[Sentinel] Reasoning cooldown: " << reasoning_cooldown_sec << " second(s)\n";
     std::cout << "[Sentinel] KPI persistence: "
               << (kpi_dir.empty() ? "disabled" : kpi_dir) << "\n";
 
@@ -182,6 +185,7 @@ bool Pipeline::run() {
 
     double last_scene_print_time_sec = -1000.0;
     double last_clip_save_time_sec = -1000.0;
+    double last_reasoning_request_time_sec = -1000.0;
 
     std::string llm_summary = "Local vision mode: LLM disabled.";
     std::string llm_risk = "low";
@@ -341,6 +345,14 @@ bool Pipeline::run() {
                 person_loitering_flags);
 
             const std::string scene_json = scene_state_builder.toJson(scene_state);
+
+            if (loitering_detected &&
+                (current_time_sec - last_reasoning_request_time_sec) >=
+                    static_cast<double>(reasoning_cooldown_sec)) {
+                kpi_writer.writeReasoningRequest("loitering", scene_json);
+                std::cout << "[Reasoning] Queued loitering SceneState.\n";
+                last_reasoning_request_time_sec = current_time_sec;
+            }
 
             if ((current_time_sec - last_scene_print_time_sec) >=
                 static_cast<double>(scene_interval_sec)) {

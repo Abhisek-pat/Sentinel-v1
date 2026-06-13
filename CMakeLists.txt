@@ -171,6 +171,15 @@ if(BUILD_TESTING)
     target_link_libraries(zone_manager_test PRIVATE ${OpenCV_LIBS})
     add_test(NAME zone_manager_test COMMAND zone_manager_test)
 
+    add_executable(kpi_writer_test
+        tests/kpi_writer_test.cpp
+        src/monitoring/kpi_writer.cpp
+    )
+    target_include_directories(kpi_writer_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME kpi_writer_test COMMAND kpi_writer_test)
+
     if(Python3_Interpreter_FOUND)
         execute_process(
             COMMAND ${Python3_EXECUTABLE} -c "import fastapi"
@@ -196,9 +205,11 @@ if(BUILD_TESTING)
         target_compile_options(tracker_test PRIVATE /W4 /EHsc)
         target_compile_options(event_engine_test PRIVATE /W4 /EHsc)
         target_compile_options(zone_manager_test PRIVATE /W4 /EHsc)
+        target_compile_options(kpi_writer_test PRIVATE /W4 /EHsc)
     else()
         target_compile_options(tracker_test PRIVATE -Wall -Wextra)
         target_compile_options(event_engine_test PRIVATE -Wall -Wextra)
         target_compile_options(zone_manager_test PRIVATE -Wall -Wextra)
+        target_compile_options(kpi_writer_test PRIVATE -Wall -Wextra)
     endif()
 endif()

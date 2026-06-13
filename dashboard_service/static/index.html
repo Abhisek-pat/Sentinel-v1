@@ -15,6 +15,9 @@
     <div class="top-actions">
       <label for="window-select">Window</label>
       <select id="window-select">
+        <option value="10">10 minutes</option>
+        <option value="20">20 minutes</option>
+        <option value="30">30 minutes</option>
         <option value="60">1 hour</option>
         <option value="360">6 hours</option>
         <option value="1440">24 hours</option>
@@ -71,6 +74,18 @@
         <div><span>Short zone exits</span><strong id="short-exits">--</strong></div>
         <div><span>Loitering</span><strong id="loitering">--</strong></div>
         <div><span>Clips saved</span><strong id="clips">--</strong></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="section-heading">
+        <div><h2>Reasoning</h2><p>Latest asynchronous event assessments</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Risk</th><th>Provider</th><th>Latency</th><th>Assessment</th></tr></thead>
+          <tbody id="reasoning-table"><tr><td colspan="5">Waiting for reasoning results</td></tr></tbody>
+        </table>
       </div>
     </section>
 

@@ -120,6 +120,21 @@ Use `/benchmark` to run the same SceneState repeatedly against selected model
 profiles. Its comparison output includes success rate, latency statistics, and
 risk-level counts.
 
+Loitering events automatically queue an asynchronous reasoning request. The
+selected provider is called by the reasoning sidecar, with `mock` used as a
+fallback. Sentinel queues no more than one request per
+`SENTINEL_REASONING_COOLDOWN_SEC` window, which defaults to 60 seconds.
+
+```bash
+sudo journalctl -u sentinel -f
+sudo journalctl -u sentinel-llm -f
+tail -f /var/lib/sentinel/kpi/reasoning_results.jsonl
+curl "http://127.0.0.1:8080/api/reasoning?limit=10"
+```
+
+Reasoning results appear in the operations dashboard without blocking the
+vision pipeline.
+
 ## First-Device Benchmark
 
 Run the real camera feed for at least 30 minutes. Watch logs, temperature,

@@ -29,6 +29,8 @@ public:
     bool enabled() const;
     void writeTelemetry(const TelemetryKpi& telemetry);
     void writeEvent(const std::string& category, const std::string& message);
+    void writeReasoningRequest(const std::string& trigger,
+                               const std::string& scene_state_json);
 
 private:
     static std::int64_t unixTimeMilliseconds();
@@ -36,4 +38,5 @@ private:
 
     std::ofstream telemetry_stream_;
     std::ofstream event_stream_;
+    std::ofstream reasoning_request_stream_;
 };

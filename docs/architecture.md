@@ -44,9 +44,12 @@ configured without changing application code. The benchmark endpoint returns
 individual runs plus per-model success rate, average/minimum/maximum latency,
 and risk-level counts.
 
-Sentinel does not call this service from the real-time pipeline yet; the next
-integration increment will invoke it asynchronously so capture and inference
-cannot be blocked by model latency.
+Sentinel asynchronously queues a SceneState when loitering is detected. Queue
+writes occur inside the vision process, but provider requests run in a
+background worker owned by the reasoning sidecar. The worker persists its
+queue offset, falls back to `mock` when the selected provider fails, and writes
+results for dashboard ingestion. Provider latency cannot block capture or
+inference.
 
 `src/reasoning/llm_client.*` is the earlier Windows-only synchronous prototype
 and remains outside the CMake target.

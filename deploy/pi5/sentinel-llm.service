@@ -8,6 +8,7 @@ Type=simple
 User=sentinel
 Group=sentinel
 EnvironmentFile=-/etc/sentinel/llm.env
+Environment=SENTINEL_KPI_DIR=/var/lib/sentinel/kpi
 ExecStart=/opt/sentinel/llm-venv/bin/uvicorn app:app --app-dir /opt/sentinel/share/sentinel/llm_service --host 127.0.0.1 --port 8090
 Restart=on-failure
 RestartSec=5
@@ -15,6 +16,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+ReadWritePaths=/var/lib/sentinel/kpi
 
 [Install]
 WantedBy=multi-user.target

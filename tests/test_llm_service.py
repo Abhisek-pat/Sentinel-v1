@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import threading
+import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -143,6 +144,75 @@ class LlmServiceTest(unittest.TestCase):
         mock = next(provider for provider in result["providers"] if provider["name"] == "mock")
         self.assertEqual("ready", mock["status"])
         self.assertIn("reachability", mock["detail"])
+
+    def test_async_queue_processes_each_request_once(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request_path = root / "reasoning_requests.jsonl"
+            result_path = root / "reasoning_results.jsonl"
+            offset_path = root / "reasoning_requests.offset"
+            request_path.write_text(
+                json.dumps(
+                    {
+                        "request_id": "request-1",
+                        "timestamp_ms": 1000,
+                        "trigger": "loitering",
+                        "scene_state": {
+                            "persons": [{"track_id": 7, "loitering": True}],
+                            "recent_events": [],
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(app, "KPI_DIR", root),
+                patch.object(app, "REQUESTS_PATH", request_path),
+                patch.object(app, "RESULTS_PATH", result_path),
+                patch.object(app, "OFFSET_PATH", offset_path),
+            ):
+                self.assertEqual(1, app.process_pending_requests())
+                self.assertEqual(0, app.process_pending_requests())
+
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual("medium", result["risk_level"])
+            self.assertEqual("loitering", result["trigger"])
+            self.assertTrue(result["success"])
+
+    def test_async_request_falls_back_to_mock(self) -> None:
+        request = {
+            "request_id": "request-2",
+            "timestamp_ms": 1000,
+            "trigger": "loitering",
+            "provider": "missing-provider",
+            "scene_state": {
+                "persons": [{"track_id": 7, "loitering": True}],
+                "recent_events": [],
+            },
+        }
+        result = app.process_reasoning_request(request)
+        self.assertTrue(result["fallback_used"])
+        self.assertEqual("mock", result["provider"])
+        self.assertEqual("medium", result["risk_level"])
+
+    def test_async_queue_retries_partial_record(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request_path = root / "reasoning_requests.jsonl"
+            result_path = root / "reasoning_results.jsonl"
+            offset_path = root / "reasoning_requests.offset"
+            request_path.write_text('{"request_id":"partial"', encoding="utf-8")
+            with (
+                patch.object(app, "KPI_DIR", root),
+                patch.object(app, "REQUESTS_PATH", request_path),
+                patch.object(app, "RESULTS_PATH", result_path),
+                patch.object(app, "OFFSET_PATH", offset_path),
+            ):
+                self.assertEqual(0, app.process_pending_requests())
+
+            self.assertEqual("0", offset_path.read_text(encoding="utf-8"))
+            self.assertFalse(result_path.exists())
 
 
 if __name__ == "__main__":
