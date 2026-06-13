@@ -35,6 +35,8 @@ keys or network access. The service exposes:
 
 - `POST /reason` for one provider inference.
 - `POST /benchmark` for repeated, comparable provider runs.
+- `GET /evaluation/cases` for the reusable labeled SceneState evaluation set.
+- `POST /evaluate` for provider correctness and latency comparison.
 - `GET /providers` for provider and model discovery.
 - `GET /health` for service readiness.
 
@@ -43,6 +45,11 @@ provider, model, and request latency. OpenAI-compatible model profiles can be
 configured without changing application code. The benchmark endpoint returns
 individual runs plus per-model success rate, average/minimum/maximum latency,
 and risk-level counts.
+
+The evaluation endpoint runs every selected provider against labeled low,
+medium, and high-risk SceneStates. It reports provider availability, risk
+classification accuracy, and latency. Evaluation is always explicitly invoked
+and is never part of the live event-processing path.
 
 Sentinel asynchronously queues a SceneState when loitering is detected. Queue
 writes occur inside the vision process, but provider requests run in a

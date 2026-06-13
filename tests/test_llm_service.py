@@ -89,6 +89,18 @@ class LlmServiceTest(unittest.TestCase):
         self.assertEqual(1, len(result["comparisons"]))
         self.assertEqual(100.0, result["comparisons"][0]["success_rate_percent"])
 
+    def test_evaluation_cases_cover_all_risk_levels(self) -> None:
+        result = app.evaluation_cases()
+        self.assertGreaterEqual(result["count"], 5)
+        self.assertEqual(["high", "low", "medium"], result["risk_levels"])
+
+    def test_mock_provider_scores_full_evaluation_accuracy(self) -> None:
+        result = app.evaluate(app.EvaluationRequest(providers=["mock"], iterations=2))
+        comparison = result["comparisons"][0]
+        self.assertEqual(result["case_count"] * 2, result["total_requests"])
+        self.assertEqual(100.0, comparison["success_rate_percent"])
+        self.assertEqual(100.0, comparison["risk_accuracy_percent"])
+
     def test_openai_compatible_provider_contract(self) -> None:
         server = ThreadingHTTPServer(("127.0.0.1", 0), CompatibleEndpointHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)

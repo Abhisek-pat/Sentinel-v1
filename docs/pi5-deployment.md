@@ -5,7 +5,8 @@
 The Pi should be treated as an edge vision appliance, not a development
 desktop. Run one 64-bit headless Sentinel process, use the camera's low
 resolution substream, perform local person detection and event recording, and
-keep the optional Python/OpenAI reasoning service off the Pi.
+keep the optional Python/OpenAI reasoning service isolated from the real-time
+vision process.
 
 Recommended baseline:
 
@@ -119,6 +120,27 @@ curl -X POST http://127.0.0.1:8090/reason \
 Use `/benchmark` to run the same SceneState repeatedly against selected model
 profiles. Its comparison output includes success rate, latency statistics, and
 risk-level counts.
+
+Use the labeled evaluation suite to compare classification accuracy and
+latency across models:
+
+```bash
+curl http://127.0.0.1:8090/evaluation/cases
+curl -X POST http://127.0.0.1:8090/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"providers":["mock"],"iterations":1}'
+```
+
+Run cloud models only when intentionally benchmarking them. An evaluation
+creates `case_count * provider_count * iterations` requests. For example, the
+included five-case suite with `mock` and `openai-cloud` creates five paid
+OpenAI requests:
+
+```bash
+curl -X POST http://127.0.0.1:8090/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{"providers":["mock","openai-cloud"],"iterations":1}'
+```
 
 Loitering events automatically queue an asynchronous reasoning request. The
 selected provider is called by the reasoning sidecar, with `mock` used as a

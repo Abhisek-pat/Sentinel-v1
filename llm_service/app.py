@@ -23,6 +23,11 @@ class BenchmarkRequest(BaseModel):
     iterations: int = Field(default=1, ge=1, le=20)
 
 
+class EvaluationRequest(BaseModel):
+    providers: list[str] = Field(default_factory=list)
+    iterations: int = Field(default=1, ge=1, le=5)
+
+
 def result_payload(result: ReasoningResult, latency_ms: float) -> dict[str, Any]:
     return {
         "summary": result.summary,
@@ -44,6 +49,7 @@ RESULTS_PATH = KPI_DIR / "reasoning_results.jsonl"
 OFFSET_PATH = KPI_DIR / "reasoning_requests.offset"
 POLL_INTERVAL_SEC = max(0.2, float(os.environ.get("SENTINEL_REASONING_POLL_SEC", "1")))
 FALLBACK_PROVIDER = os.environ.get("SENTINEL_LLM_FALLBACK_PROVIDER", "mock")
+EVALUATION_CASES_PATH = Path(__file__).with_name("evaluation_cases.json")
 worker_stop = threading.Event()
 worker_thread: threading.Thread | None = None
 
@@ -63,6 +69,16 @@ def reason(scene_state: dict[str, Any], provider_name: str | None = None) -> dic
     except ProviderError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     return result_payload(result, (time.perf_counter() - started) * 1000.0)
+
+
+def load_evaluation_cases() -> list[dict[str, Any]]:
+    try:
+        cases = json.loads(EVALUATION_CASES_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise HTTPException(status_code=500, detail=f"Could not load evaluation cases: {error}") from error
+    if not isinstance(cases, list):
+        raise HTTPException(status_code=500, detail="Evaluation cases must be a JSON array.")
+    return cases
 
 
 def process_reasoning_request(request: dict[str, Any]) -> dict[str, Any]:
@@ -260,4 +276,75 @@ def benchmark(request: BenchmarkRequest) -> dict[str, Any]:
         "scene_persons": len(request.scene_state.get("persons", [])),
         "runs": runs,
         "comparisons": comparisons,
+    }
+
+
+@app.get("/evaluation/cases")
+def evaluation_cases() -> dict[str, Any]:
+    cases = load_evaluation_cases()
+    return {
+        "count": len(cases),
+        "risk_levels": sorted({str(case.get("expected_risk", "unknown")) for case in cases}),
+        "cases": cases,
+    }
+
+
+@app.post("/evaluate")
+def evaluate(request: EvaluationRequest) -> dict[str, Any]:
+    selected = request.providers or sorted(providers)
+    cases = load_evaluation_cases()
+    runs: list[dict[str, Any]] = []
+
+    for provider_name in selected:
+        for case in cases:
+            for iteration in range(request.iterations):
+                run = {
+                    "provider": provider_name,
+                    "case_id": str(case.get("id", "")),
+                    "expected_risk": str(case.get("expected_risk", "unknown")),
+                    "iteration": iteration + 1,
+                }
+                try:
+                    result = reason(case.get("scene_state", {}), provider_name)
+                    run.update(result)
+                    run["correct_risk"] = result["risk_level"] == run["expected_risk"]
+                except HTTPException as error:
+                    run.update({"success": False, "correct_risk": False, "error": error.detail})
+                runs.append(run)
+
+    comparisons: list[dict[str, Any]] = []
+    for provider_name in selected:
+        provider_runs = [run for run in runs if run["provider"] == provider_name]
+        successful_runs = [run for run in provider_runs if run.get("success")]
+        latencies = [float(run["latency_ms"]) for run in successful_runs]
+        comparisons.append(
+            {
+                "provider": provider_name,
+                "model": successful_runs[0]["model"] if successful_runs else None,
+                "cases": len(cases),
+                "runs": len(provider_runs),
+                "successes": len(successful_runs),
+                "correct_risk": sum(bool(run.get("correct_risk")) for run in provider_runs),
+                "success_rate_percent": round(
+                    len(successful_runs) / max(1, len(provider_runs)) * 100.0, 2
+                ),
+                "risk_accuracy_percent": round(
+                    sum(bool(run.get("correct_risk")) for run in provider_runs)
+                    / max(1, len(provider_runs))
+                    * 100.0,
+                    2,
+                ),
+                "latency_avg_ms": round(statistics.mean(latencies), 2) if latencies else None,
+                "latency_min_ms": round(min(latencies), 2) if latencies else None,
+                "latency_max_ms": round(max(latencies), 2) if latencies else None,
+            }
+        )
+
+    return {
+        "case_count": len(cases),
+        "providers": selected,
+        "iterations": request.iterations,
+        "total_requests": len(runs),
+        "comparisons": comparisons,
+        "runs": runs,
     }

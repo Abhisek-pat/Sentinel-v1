@@ -1,0 +1,85 @@
+[
+  {
+    "id": "empty-scene",
+    "description": "No people or recent security events.",
+    "expected_risk": "low",
+    "scene_state": {
+      "persons": [],
+      "recent_events": []
+    }
+  },
+  {
+    "id": "person-present",
+    "description": "A person is present without loitering or a security event.",
+    "expected_risk": "low",
+    "scene_state": {
+      "persons": [
+        {
+          "track_id": 1,
+          "loitering": false
+        }
+      ],
+      "recent_events": [
+        "[Event] Track 1 (person) entered scene"
+      ]
+    }
+  },
+  {
+    "id": "center-zone-loitering",
+    "description": "One person is loitering in the center zone.",
+    "expected_risk": "medium",
+    "scene_state": {
+      "persons": [
+        {
+          "track_id": 7,
+          "zone": "CENTER_ZONE",
+          "dwell_time_sec": 14.2,
+          "loitering": true
+        }
+      ],
+      "recent_events": [
+        "[Zone] Track 7 loitering in CENTER_ZONE for 14.2s"
+      ]
+    }
+  },
+  {
+    "id": "two-person-loitering",
+    "description": "Two people are present and one is loitering.",
+    "expected_risk": "medium",
+    "scene_state": {
+      "persons": [
+        {
+          "track_id": 8,
+          "zone": "CENTER_ZONE",
+          "dwell_time_sec": 18.5,
+          "loitering": true
+        },
+        {
+          "track_id": 9,
+          "zone": "CENTER_ZONE",
+          "dwell_time_sec": 3.1,
+          "loitering": false
+        }
+      ],
+      "recent_events": [
+        "[Zone] Track 8 loitering in CENTER_ZONE for 18.5s"
+      ]
+    }
+  },
+  {
+    "id": "forced-entry",
+    "description": "A forced-entry emergency was reported.",
+    "expected_risk": "high",
+    "scene_state": {
+      "persons": [
+        {
+          "track_id": 12,
+          "loitering": false
+        }
+      ],
+      "recent_events": [
+        "Emergency forced entry reported"
+      ]
+    }
+  }
+]
