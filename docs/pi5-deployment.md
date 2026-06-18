@@ -148,6 +148,22 @@ Evaluation summaries persist in the dashboard and can be queried with:
 curl "http://127.0.0.1:8080/api/evaluations?limit=20"
 ```
 
+Generate a ranked comparison report from the persisted dashboard results:
+
+```bash
+mkdir -p ~/sentinel-reports
+curl "http://127.0.0.1:8080/api/evaluations?limit=20" \
+  -o ~/sentinel-reports/evaluations.json
+python3 deploy/pi5/analyze_evaluations.py \
+  ~/sentinel-reports/evaluations.json \
+  --label pi5-baseline \
+  --json-output ~/sentinel-reports/llm-comparison.json \
+  --markdown-output ~/sentinel-reports/llm-comparison.md
+```
+
+The report ranks providers by risk accuracy, success rate, p95 latency, and
+average latency. Re-run the same command after adding each new model profile.
+
 Loitering events automatically queue an asynchronous reasoning request. The
 selected provider is called by the reasoning sidecar, with `mock` used as a
 fallback. Sentinel queues no more than one request per
