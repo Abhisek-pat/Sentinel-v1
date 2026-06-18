@@ -148,6 +148,29 @@ Evaluation summaries persist in the dashboard and can be queried with:
 curl "http://127.0.0.1:8080/api/evaluations?limit=20"
 ```
 
+To avoid hand-editing one-line JSON, render a multi-provider config with:
+
+```bash
+python3 deploy/pi5/configure_llm_profiles.py \
+  --profile "name=openai-fast,base_url=https://api.openai.com/v1,model=gpt-4.1-mini,api_key_env=OPENAI_API_KEY,timeout_sec=60" \
+  --profile "name=openai-alt,base_url=https://api.openai.com/v1,model=REPLACE_WITH_MODEL_ID,api_key_env=OPENAI_API_KEY,timeout_sec=60" \
+  --profile "name=cloud-alt,base_url=https://YOUR_PROVIDER_BASE_URL/v1,model=REPLACE_WITH_MODEL_ID,api_key_env=CLOUD_ALT_API_KEY,timeout_sec=60" \
+  --default-provider openai-fast \
+  --output ~/sentinel-reports/llm.env.generated
+```
+
+Review the generated file, then install it:
+
+```bash
+sudo install -m 0640 -o root -g sentinel \
+  ~/sentinel-reports/llm.env.generated /etc/sentinel/llm.env
+sudo systemctl restart sentinel-llm
+curl http://127.0.0.1:8090/providers
+```
+
+Use model IDs that are available in your provider account. For OpenAI, confirm
+the current model list in the official API dashboard or models documentation.
+
 Generate a ranked comparison report from the persisted dashboard results:
 
 ```bash
