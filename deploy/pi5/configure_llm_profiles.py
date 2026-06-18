@@ -24,6 +24,10 @@ def parse_profile(raw_profile: str) -> dict[str, object]:
         "model": values["model"],
         "timeout_sec": float(values.get("timeout_sec", "60")),
     }
+    if values.get("retry_count"):
+        profile["retry_count"] = int(values["retry_count"])
+    if values.get("retry_backoff_sec"):
+        profile["retry_backoff_sec"] = float(values["retry_backoff_sec"])
     if values.get("api_key_env"):
         profile["api_key_env"] = values["api_key_env"]
     return profile
@@ -63,7 +67,8 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help=(
             "Provider as comma-separated key=value pairs. Required keys: "
-            "name,base_url,model. Optional: api_key_env,timeout_sec,type."
+            "name,base_url,model. Optional: api_key_env,timeout_sec,type,"
+            "retry_count,retry_backoff_sec."
         ),
     )
     parser.add_argument("--default-provider", default="mock")

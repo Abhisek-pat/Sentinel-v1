@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -94,12 +95,16 @@ class OpenAiCompatibleProvider:
         model: str,
         api_key_env: str = "",
         timeout_sec: float = 30.0,
+        retry_count: int = 2,
+        retry_backoff_sec: float = 1.0,
     ) -> None:
         self.name = name
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key_env = api_key_env
         self.timeout_sec = timeout_sec
+        self.retry_count = max(0, retry_count)
+        self.retry_backoff_sec = max(0.0, retry_backoff_sec)
 
     def configuration_error(self) -> str:
         if not self.base_url:
@@ -168,11 +173,7 @@ class OpenAiCompatibleProvider:
             headers=headers,
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
-                response_body = response.read().decode("utf-8")
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise ProviderError(f"Provider '{self.name}' request failed: {error}") from error
+        response_body = self._post_with_retries(request)
 
         try:
             payload = json.loads(response_body)
@@ -200,6 +201,39 @@ class OpenAiCompatibleProvider:
             model=self.model,
         )
 
+    def _post_with_retries(self, request: urllib.request.Request) -> str:
+        transient_statuses = {408, 429, 500, 502, 503, 504}
+        last_error: BaseException | None = None
+        for attempt in range(self.retry_count + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout_sec) as response:
+                    return response.read().decode("utf-8")
+            except urllib.error.HTTPError as error:
+                last_error = error
+                if error.code not in transient_statuses or attempt >= self.retry_count:
+                    detail = error.reason
+                    try:
+                        body = error.read().decode("utf-8").strip()
+                    except (OSError, UnicodeDecodeError):
+                        body = ""
+                    if body:
+                        detail = f"{detail}: {body[:300]}"
+                    raise ProviderError(
+                        f"Provider '{self.name}' request failed: HTTP Error "
+                        f"{error.code}: {detail}"
+                    ) from error
+            except (urllib.error.URLError, TimeoutError, OSError) as error:
+                last_error = error
+                if attempt >= self.retry_count:
+                    raise ProviderError(
+                        f"Provider '{self.name}' request failed: {error}"
+                    ) from error
+
+            if self.retry_backoff_sec > 0:
+                time.sleep(self.retry_backoff_sec * (2**attempt))
+
+        raise ProviderError(f"Provider '{self.name}' request failed: {last_error}")
+
 
 def create_providers() -> dict[str, ReasoningProvider]:
     providers: dict[str, ReasoningProvider] = {"mock": MockProvider()}
@@ -224,5 +258,7 @@ def create_providers() -> dict[str, ReasoningProvider]:
             model=str(profile.get("model", "")).strip(),
             api_key_env=str(profile.get("api_key_env", "")).strip(),
             timeout_sec=float(profile.get("timeout_sec", 30.0)),
+            retry_count=int(profile.get("retry_count", 2)),
+            retry_backoff_sec=float(profile.get("retry_backoff_sec", 1.0)),
         )
     return providers

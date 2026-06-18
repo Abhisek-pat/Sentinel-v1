@@ -108,6 +108,8 @@ SENTINEL_LLM_PROFILES_JSON='[{"name":"model-a","type":"openai_compatible","base_
 ```
 
 Replace the example address and model name with a running model endpoint.
+Cloud profiles can also set `retry_count` and `retry_backoff_sec` to smooth out
+short-lived provider errors such as HTTP 503 or rate-limit retries.
 `/providers` validates configuration and reports a readiness detail, but it
 does not contact the model server. Verify reachability with `/reason`:
 
@@ -153,7 +155,7 @@ To avoid hand-editing one-line JSON, render a multi-provider config with:
 ```bash
 python3 deploy/pi5/configure_llm_profiles.py \
   --profile "name=openai-fast,base_url=https://api.openai.com/v1,model=gpt-4.1-mini,api_key_env=OPENAI_API_KEY,timeout_sec=60" \
-  --profile "name=openai-alt,base_url=https://api.openai.com/v1,model=REPLACE_WITH_MODEL_ID,api_key_env=OPENAI_API_KEY,timeout_sec=60" \
+  --profile "name=gemini-flash,base_url=https://generativelanguage.googleapis.com/v1beta/openai,model=gemini-3.5-flash,api_key_env=GEMINI_API_KEY,timeout_sec=60,retry_count=3,retry_backoff_sec=2" \
   --profile "name=cloud-alt,base_url=https://YOUR_PROVIDER_BASE_URL/v1,model=REPLACE_WITH_MODEL_ID,api_key_env=CLOUD_ALT_API_KEY,timeout_sec=60" \
   --default-provider openai-fast \
   --output ~/sentinel-reports/llm.env.generated

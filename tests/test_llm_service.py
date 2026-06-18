@@ -51,6 +51,47 @@ class CompatibleEndpointHandler(BaseHTTPRequestHandler):
         return
 
 
+class FlakyCompatibleEndpointHandler(BaseHTTPRequestHandler):
+    requests_seen = 0
+
+    def do_POST(self) -> None:
+        type(self).requests_seen += 1
+        if type(self).requests_seen == 1:
+            response = b'{"error":"temporarily unavailable"}'
+            self.send_response(503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
+            return
+
+        response = json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "summary": "Retry recovered the remote model.",
+                                    "risk_level": "medium",
+                                    "recommended_action": "Continue monitoring.",
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
 class LlmServiceTest(unittest.TestCase):
     def test_empty_scene_is_low_risk(self) -> None:
         result = app.reason({"persons": [], "recent_events": []})
@@ -138,6 +179,27 @@ class LlmServiceTest(unittest.TestCase):
             self.assertEqual("remote-test", result.provider)
             self.assertEqual("test-model", result.model)
             self.assertEqual("low", result.risk_level)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_openai_compatible_provider_retries_transient_http_errors(self) -> None:
+        FlakyCompatibleEndpointHandler.requests_seen = 0
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FlakyCompatibleEndpointHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            provider = providers_module.OpenAiCompatibleProvider(
+                name="flaky-remote",
+                base_url=f"http://127.0.0.1:{server.server_port}/v1",
+                model="test-model",
+                retry_count=1,
+                retry_backoff_sec=0,
+            )
+            result = provider.reason({"persons": [{"loitering": True}], "recent_events": []})
+            self.assertEqual("medium", result.risk_level)
+            self.assertEqual(2, FlakyCompatibleEndpointHandler.requests_seen)
         finally:
             server.shutdown()
             server.server_close()

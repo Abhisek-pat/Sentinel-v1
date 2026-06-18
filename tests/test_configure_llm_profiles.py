@@ -18,7 +18,8 @@ class ConfigureLlmProfilesTest(unittest.TestCase):
     def test_renders_valid_env(self) -> None:
         profile = configure_llm_profiles.parse_profile(
             "name=openai-fast,base_url=https://api.openai.com/v1,"
-            "model=gpt-4.1-mini,api_key_env=OPENAI_API_KEY,timeout_sec=45"
+            "model=gpt-4.1-mini,api_key_env=OPENAI_API_KEY,timeout_sec=45,"
+            "retry_count=3,retry_backoff_sec=2"
         )
         rendered = configure_llm_profiles.render_env(
             [profile],
@@ -27,6 +28,8 @@ class ConfigureLlmProfilesTest(unittest.TestCase):
         )
         self.assertIn("SENTINEL_LLM_PROVIDER=openai-fast", rendered)
         self.assertIn("\"api_key_env\":\"OPENAI_API_KEY\"", rendered)
+        self.assertIn("\"retry_count\":3", rendered)
+        self.assertIn("\"retry_backoff_sec\":2.0", rendered)
 
     def test_rejects_unknown_default_provider(self) -> None:
         profile = configure_llm_profiles.parse_profile(
