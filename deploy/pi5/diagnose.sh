@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+DASHBOARD_CURL_HEADERS=()
+if [[ -f /etc/sentinel/dashboard.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/sentinel/dashboard.env
+fi
+if [[ -n "${SENTINEL_DASHBOARD_TOKEN:-}" ]]; then
+  DASHBOARD_CURL_HEADERS=(-H "Authorization: Bearer ${SENTINEL_DASHBOARD_TOKEN}")
+fi
+
 echo "Architecture: $(uname -m)"
 echo "OS: $(. /etc/os-release && echo "${PRETTY_NAME}")"
 echo "Memory:"
@@ -23,11 +32,11 @@ echo "Dashboard health:"
 curl --silent --show-error --max-time 5 http://127.0.0.1:8080/health || true
 echo
 echo "Latest KPI summary:"
-curl --silent --show-error --max-time 5 \
+curl "${DASHBOARD_CURL_HEADERS[@]}" --silent --show-error --max-time 5 \
   "http://127.0.0.1:8080/api/summary?window_minutes=10" || true
 echo
 echo "Latest evaluations:"
-curl --silent --show-error --max-time 5 \
+curl "${DASHBOARD_CURL_HEADERS[@]}" --silent --show-error --max-time 5 \
   "http://127.0.0.1:8080/api/evaluations?limit=10" || true
 echo
 echo "Reasoning health:"

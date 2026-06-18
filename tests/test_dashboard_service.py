@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
 
 ROOT_DIR = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT_DIR))
@@ -14,6 +16,36 @@ app = importlib.import_module("dashboard_service.app")
 
 
 class DashboardReasoningTest(unittest.TestCase):
+    def test_dashboard_auth_is_disabled_by_default(self) -> None:
+        with patch.object(app, "DASHBOARD_TOKEN", ""):
+            client = TestClient(app.app)
+            response = client.get("/api/device")
+        self.assertNotEqual(401, response.status_code)
+
+    def test_dashboard_auth_rejects_missing_token(self) -> None:
+        with patch.object(app, "DASHBOARD_TOKEN", "secret-token"):
+            client = TestClient(app.app)
+            response = client.get("/api/device")
+        self.assertEqual(401, response.status_code)
+
+    def test_dashboard_auth_accepts_bearer_token(self) -> None:
+        with patch.object(app, "DASHBOARD_TOKEN", "secret-token"):
+            client = TestClient(app.app)
+            response = client.get(
+                "/api/device",
+                headers={"Authorization": "Bearer secret-token"},
+            )
+        self.assertNotEqual(401, response.status_code)
+
+    def test_dashboard_token_query_sets_browser_cookie(self) -> None:
+        with patch.object(app, "DASHBOARD_TOKEN", "secret-token"):
+            client = TestClient(app.app)
+            response = client.get("/?token=secret-token")
+            api_response = client.get("/api/device")
+        self.assertEqual(200, response.status_code)
+        self.assertIn(app.DASHBOARD_COOKIE_NAME, response.cookies)
+        self.assertNotEqual(401, api_response.status_code)
+
     def test_reasoning_health_and_backlog_alert(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

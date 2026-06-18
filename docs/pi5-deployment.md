@@ -72,8 +72,39 @@ KPI database retains seven days by default. Raw KPI JSONL files are compacted
 after reaching 25 MiB. Active alerts cover stale streams,
 low capture FPS, slow inference, overheating, throttling, low disk space, and
 excessive short zone exits. The current service listens on port 8080 for LAN testing.
-Authentication and secure remote access are scheduled before production
-exposure.
+
+Dashboard authentication is disabled until `SENTINEL_DASHBOARD_TOKEN` is set in
+`/etc/sentinel/dashboard.env`. Enable it before exposing the dashboard beyond a
+trusted LAN:
+
+```bash
+sudo nano /etc/sentinel/dashboard.env
+sudo systemctl restart sentinel-dashboard
+```
+
+Example value:
+
+```text
+SENTINEL_DASHBOARD_TOKEN=replace-with-a-long-random-token
+```
+
+Scripts can use a bearer token:
+
+```bash
+curl -H "Authorization: Bearer replace-with-a-long-random-token" \
+  http://127.0.0.1:8080/api/dashboard
+```
+
+For browser access, open the dashboard once with the token query parameter to
+set the same-origin cookie:
+
+```text
+http://<pi-ip-address>:8080/?token=replace-with-a-long-random-token
+```
+
+After that, use the normal dashboard URL. Keep the token private and rotate it
+if it is shared accidentally. For internet access, place the dashboard behind a
+VPN or authenticated reverse proxy rather than exposing port 8080 directly.
 
 ## Reasoning API
 
@@ -280,6 +311,17 @@ Run the automated soak test from the repository:
 
 ```bash
 mkdir -p ~/sentinel-reports
+python3 deploy/pi5/soak_test.py \
+  --duration-hours 24 \
+  --interval-sec 60 \
+  --output ~/sentinel-reports/pi5-24h-soak.json
+```
+
+If dashboard authentication is enabled, either export the token before running
+the soak test or pass `--dashboard-token`:
+
+```bash
+export SENTINEL_DASHBOARD_TOKEN=replace-with-a-long-random-token
 python3 deploy/pi5/soak_test.py \
   --duration-hours 24 \
   --interval-sec 60 \

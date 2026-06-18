@@ -49,6 +49,9 @@ fi
 if [[ ! -f /etc/sentinel/llm.env ]]; then
   install -m 0640 -o root -g sentinel "${ROOT_DIR}/deploy/pi5/llm.env" /etc/sentinel/llm.env
 fi
+if [[ ! -f /etc/sentinel/dashboard.env ]]; then
+  install -m 0640 -o root -g sentinel "${ROOT_DIR}/deploy/pi5/dashboard.env" /etc/sentinel/dashboard.env
+fi
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel.service" /etc/systemd/system/sentinel.service
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-dashboard.service" /etc/systemd/system/sentinel-dashboard.service
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-llm.service" /etc/systemd/system/sentinel-llm.service

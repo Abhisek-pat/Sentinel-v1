@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import subprocess
@@ -8,8 +9,8 @@ import time
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 KPI_DIR = Path(os.environ.get("SENTINEL_KPI_DIR", "/var/lib/sentinel/kpi"))
@@ -36,6 +37,8 @@ ALERT_REASONING_PENDING_MAX = int(os.environ.get("SENTINEL_ALERT_REASONING_PENDI
 ALERT_REASONING_FAILURE_RATIO_MAX = float(
     os.environ.get("SENTINEL_ALERT_REASONING_FAILURE_RATIO_MAX", "0.25")
 )
+DASHBOARD_TOKEN = os.environ.get("SENTINEL_DASHBOARD_TOKEN", "").strip()
+DASHBOARD_COOKIE_NAME = "sentinel_dashboard_token"
 JSONL_MAX_BYTES = max(
     1024 * 1024,
     int(os.environ.get("SENTINEL_KPI_JSONL_MAX_MB", "25")) * 1024 * 1024,
@@ -49,6 +52,47 @@ OPTIONAL_JSONL_FIELDS: dict[str, Any] = {
 app = FastAPI(title="Sentinel KPI API")
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def dashboard_auth_enabled() -> bool:
+    return bool(DASHBOARD_TOKEN)
+
+
+def request_token(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    header_token = request.headers.get("x-sentinel-token", "").strip()
+    if header_token:
+        return header_token
+    query_token = request.query_params.get("token", "").strip()
+    if query_token:
+        return query_token
+    return request.cookies.get(DASHBOARD_COOKIE_NAME, "").strip()
+
+
+def is_authorized(request: Request) -> bool:
+    if not dashboard_auth_enabled():
+        return True
+    token = request_token(request)
+    return bool(token) and secrets.compare_digest(token, DASHBOARD_TOKEN)
+
+
+@app.middleware("http")
+async def require_dashboard_auth(request: Request, call_next: Any) -> Any:
+    if request.url.path == "/health" or is_authorized(request):
+        return await call_next(request)
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            {"detail": "Dashboard authentication required."},
+            status_code=401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return PlainTextResponse(
+        "Dashboard authentication required. Open /?token=YOUR_TOKEN once to set a browser cookie.",
+        status_code=401,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def connect() -> sqlite3.Connection:
@@ -593,8 +637,18 @@ def health() -> dict[str, Any]:
 
 
 @app.get("/")
-def dashboard() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+def dashboard(request: Request) -> FileResponse:
+    response = FileResponse(STATIC_DIR / "index.html")
+    token = request.query_params.get("token", "").strip()
+    if dashboard_auth_enabled() and token and secrets.compare_digest(token, DASHBOARD_TOKEN):
+        response.set_cookie(
+            DASHBOARD_COOKIE_NAME,
+            token,
+            httponly=True,
+            samesite="strict",
+            max_age=60 * 60 * 24 * 30,
+        )
+    return response
 
 
 @app.get("/api/device")

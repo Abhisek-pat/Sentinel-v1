@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import statistics
 import time
 import urllib.request
@@ -9,13 +10,19 @@ from pathlib import Path
 from typing import Any
 
 
-def fetch_json(url: str, timeout_sec: float = 5.0) -> dict[str, Any]:
-    with urllib.request.urlopen(url, timeout=timeout_sec) as response:
+def fetch_json(url: str, timeout_sec: float = 5.0, token: str = "") -> dict[str, Any]:
+    request = urllib.request.Request(url)
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(request, timeout=timeout_sec) as response:
         return json.load(response)
 
 
-def collect_sample(dashboard_url: str, llm_url: str) -> dict[str, Any]:
-    dashboard = fetch_json(f"{dashboard_url}/api/dashboard?window_minutes=10")
+def collect_sample(dashboard_url: str, llm_url: str, dashboard_token: str = "") -> dict[str, Any]:
+    dashboard = fetch_json(
+        f"{dashboard_url}/api/dashboard?window_minutes=10",
+        token=dashboard_token,
+    )
     llm_health = fetch_json(f"{llm_url}/health")
     latest = dashboard.get("latest", {})
     device = dashboard.get("device", {})
@@ -126,6 +133,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--interval-sec", type=float, default=60.0)
     parser.add_argument("--samples", type=int, default=0, help="Stop after this many attempts.")
     parser.add_argument("--dashboard-url", default="http://127.0.0.1:8080")
+    parser.add_argument(
+        "--dashboard-token",
+        default=os.environ.get("SENTINEL_DASHBOARD_TOKEN", ""),
+        help="Bearer token for protected dashboard APIs.",
+    )
     parser.add_argument("--llm-url", default="http://127.0.0.1:8090")
     parser.add_argument("--output", default="")
     return parser.parse_args()
@@ -146,7 +158,11 @@ def main() -> int:
         ):
             attempts += 1
             try:
-                sample = collect_sample(args.dashboard_url, args.llm_url)
+                sample = collect_sample(
+                    args.dashboard_url,
+                    args.llm_url,
+                    args.dashboard_token,
+                )
                 samples.append(sample)
                 print(
                     f"[{attempts}] capture={sample['capture_fps']} "
