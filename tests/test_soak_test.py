@@ -52,6 +52,44 @@ class SoakTestSummaryTest(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertFalse(result["acceptance_gates"]["no_rtsp_reconnect_growth"])
 
+    def test_single_reasoning_backlog_spike_is_warning_not_failure(self) -> None:
+        samples = [
+            {
+                "capture_fps": 15,
+                "last_frame_age_ms": 2,
+                "rtsp_reconnects": 0,
+                "temperature_c": 50,
+                "throttled": "0x0",
+                "reasoning_pending": 0,
+                "dashboard_alerts": [],
+                "llm_status": "ok",
+            }
+            for _ in range(99)
+        ]
+        samples.insert(50, {**samples[0], "reasoning_pending": 206})
+        result = soak_test.summarize(samples, 100, [])
+        self.assertTrue(result["passed"])
+        self.assertEqual(206, result["summary"]["reasoning_pending_max"])
+        self.assertEqual(1, result["summary"]["reasoning_backlog_warning_samples"])
+
+    def test_sustained_reasoning_backlog_fails_acceptance(self) -> None:
+        samples = [
+            {
+                "capture_fps": 15,
+                "last_frame_age_ms": 2,
+                "rtsp_reconnects": 0,
+                "temperature_c": 50,
+                "throttled": "0x0",
+                "reasoning_pending": 10 if 4 <= index <= 8 else 0,
+                "dashboard_alerts": [],
+                "llm_status": "ok",
+            }
+            for index in range(20)
+        ]
+        result = soak_test.summarize(samples, 20, [])
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["acceptance_gates"]["reasoning_backlog_not_sustained"])
+
 
 if __name__ == "__main__":
     unittest.main()

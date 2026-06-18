@@ -254,9 +254,20 @@ python3 deploy/pi5/soak_test.py --samples 5 --interval-sec 2
 The report records API availability, capture and inference performance,
 temperature, throttling, reconnect growth, reasoning backlog, alerts, memory,
 and storage. It exits successfully only when every acceptance gate passes.
+Reasoning backlog is treated as a failure only when it is sustained across
+multiple samples or appears in more than one percent of samples. A single
+short-lived backlog spike is retained in the report as a warning signal.
 
 Generate a comprehensive diagnostic capture at any time with:
 
 ```bash
 sudo bash deploy/pi5/diagnose.sh | tee ~/sentinel-reports/diagnostics.txt
+```
+
+Analyze an existing soak report and generate a markdown summary:
+
+```bash
+python3 deploy/pi5/analyze_soak.py \
+  ~/sentinel-reports/pi5-24h-soak.json \
+  --markdown-output ~/sentinel-reports/pi5-24h-soak.md
 ```

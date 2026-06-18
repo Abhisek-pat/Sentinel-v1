@@ -1,0 +1,179 @@
+Architecture: aarch64
+OS: Debian GNU/Linux 13 (trixie)
+Memory:
+               total        used        free      shared  buff/cache   available
+Mem:           4.0Gi       923Mi       2.1Gi        38Mi       1.1Gi       3.0Gi
+Swap:          2.0Gi          0B       2.0Gi
+
+Thermal/throttling state:
+temp=49.4'C
+throttled=0x0
+
+sentinel service:
+● sentinel.service - Sentinel person monitoring
+     Loaded: loaded (/etc/systemd/system/sentinel.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-06-17 09:13:38 IST; 2min 53s ago
+ Invocation: 4788070318ca4f49b8bbea68709d135f
+   Main PID: 4535 (sentinel)
+      Tasks: 10 (limit: 4805)
+        CPU: 1min 41.976s
+     CGroup: /system.slice/sentinel.service
+             └─4535 /opt/sentinel/bin/sentinel
+
+Jun 17 09:16:10 kunmunpi5 sentinel[4535]: [Telemetry] source_fps=15.00 capture_fps=15.00 capture_delivery_percent=100.00 detection_fps=5.00 preprocess_ms=1.20 inference_ms=54.04 postprocess_ms=0.45 persons=0 rtsp_reconnects=0 last_frame_age_ms=1 capture_read_avg_ms=66.67 capture_read_max_ms=155.73 capture_slow_reads=88 capture_slow_read_percent=19.56
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: [SceneState]
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: {
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "timestamp_sec": 151.21,
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "persons": [
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   ],
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "recent_events": [
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:     "[Event] Track 0 (person) entered scene"
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: }
+
+Recent sentinel logs:
+Jun 17 09:14:11 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:14:11 kunmunpi5 sentinel[4535]: }
+Jun 17 09:14:40 kunmunpi5 sentinel[4535]: [Telemetry] source_fps=15.00 capture_fps=14.90 capture_delivery_percent=99.33 detection_fps=4.97 preprocess_ms=1.19 inference_ms=53.99 postprocess_ms=0.44 persons=0 rtsp_reconnects=0 last_frame_age_ms=1 capture_read_avg_ms=66.68 capture_read_max_ms=149.03 capture_slow_reads=97 capture_slow_read_percent=21.56
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]: [SceneState]
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]: {
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]:   "timestamp_sec": 60.76,
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]:   "persons": [
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]:   ],
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]:   "recent_events": [
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:14:41 kunmunpi5 sentinel[4535]: }
+Jun 17 09:15:10 kunmunpi5 sentinel[4535]: [Telemetry] source_fps=15.00 capture_fps=15.00 capture_delivery_percent=100.00 detection_fps=5.00 preprocess_ms=1.19 inference_ms=53.93 postprocess_ms=0.45 persons=0 rtsp_reconnects=0 last_frame_age_ms=1 capture_read_avg_ms=66.67 capture_read_max_ms=141.42 capture_slow_reads=95 capture_slow_read_percent=21.11
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]: [SceneState]
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]: {
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]:   "timestamp_sec": 90.81,
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]:   "persons": [
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]:   ],
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]:   "recent_events": [
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:15:11 kunmunpi5 sentinel[4535]: }
+Jun 17 09:15:40 kunmunpi5 sentinel[4535]: [Telemetry] source_fps=14.98 capture_fps=11.88 capture_delivery_percent=79.33 detection_fps=3.96 preprocess_ms=1.23 inference_ms=54.47 postprocess_ms=0.45 persons=0 rtsp_reconnects=0 last_frame_age_ms=2 capture_read_avg_ms=66.77 capture_read_max_ms=2681.52 capture_slow_reads=68 capture_slow_read_percent=15.11
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]: [SceneState]
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]: {
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]:   "timestamp_sec": 121.05,
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]:   "persons": [
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]:   ],
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]:   "recent_events": [
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:15:41 kunmunpi5 sentinel[4535]: }
+Jun 17 09:15:57 kunmunpi5 sentinel[4535]: [Event] Track 0 (person) entered scene
+Jun 17 09:16:10 kunmunpi5 sentinel[4535]: [Telemetry] source_fps=15.00 capture_fps=15.00 capture_delivery_percent=100.00 detection_fps=5.00 preprocess_ms=1.20 inference_ms=54.04 postprocess_ms=0.45 persons=0 rtsp_reconnects=0 last_frame_age_ms=1 capture_read_avg_ms=66.67 capture_read_max_ms=155.73 capture_slow_reads=88 capture_slow_read_percent=19.56
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: [SceneState]
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: {
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "timestamp_sec": 151.21,
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "persons": [
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   ],
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   "recent_events": [
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:     "[Event] Track 0 (person) entered scene"
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]:   ]
+Jun 17 09:16:11 kunmunpi5 sentinel[4535]: }
+
+sentinel-dashboard service:
+● sentinel-dashboard.service - Sentinel KPI API
+     Loaded: loaded (/etc/systemd/system/sentinel-dashboard.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-06-17 09:13:38 IST; 2min 53s ago
+ Invocation: 9f68378df856476c8b7fd94ba4914d96
+   Main PID: 4536 (uvicorn)
+      Tasks: 2 (limit: 4805)
+        CPU: 764ms
+     CGroup: /system.slice/sentinel-dashboard.service
+             └─4536 /opt/sentinel/dashboard-venv/bin/python3 /opt/sentinel/dashboard-venv/bin/uvicorn app:app --app-dir /opt/sentinel/share/sentinel/dashboard_service --host 0.0.0.0 --port 8080
+
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Started sentinel-dashboard.service - Sentinel KPI API.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Started server process [4536]
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Waiting for application startup.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Application startup complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+Jun 17 09:13:55 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33122 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:13:57 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33128 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:13:59 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33140 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:14:01 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33152 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:14:03 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33156 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+
+Recent sentinel-dashboard logs:
+Jun 16 10:12:28 kunmunpi5 systemd[1]: Started sentinel-dashboard.service - Sentinel KPI API.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1728]: INFO:     Started server process [1728]
+Jun 16 10:12:29 kunmunpi5 uvicorn[1728]: INFO:     Waiting for application startup.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1728]: INFO:     Application startup complete.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1728]: INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+Jun 17 09:13:37 kunmunpi5 systemd[1]: Stopping sentinel-dashboard.service - Sentinel KPI API...
+Jun 17 09:13:38 kunmunpi5 uvicorn[1728]: INFO:     Shutting down
+Jun 17 09:13:38 kunmunpi5 uvicorn[1728]: INFO:     Waiting for application shutdown.
+Jun 17 09:13:38 kunmunpi5 uvicorn[1728]: INFO:     Application shutdown complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[1728]: INFO:     Finished server process [1728]
+Jun 17 09:13:38 kunmunpi5 systemd[1]: sentinel-dashboard.service: Deactivated successfully.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Stopped sentinel-dashboard.service - Sentinel KPI API.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: sentinel-dashboard.service: Consumed 1.192s CPU time.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Started sentinel-dashboard.service - Sentinel KPI API.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Started server process [4536]
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Waiting for application startup.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Application startup complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4536]: INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+Jun 17 09:13:55 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33122 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:13:57 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33128 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:13:59 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33140 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:14:01 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33152 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+Jun 17 09:14:03 kunmunpi5 uvicorn[4536]: INFO:     127.0.0.1:33156 - "GET /api/dashboard?window_minutes=10 HTTP/1.1" 200 OK
+
+sentinel-llm service:
+● sentinel-llm.service - Sentinel reasoning service
+     Loaded: loaded (/etc/systemd/system/sentinel-llm.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2026-06-17 09:13:38 IST; 2min 53s ago
+ Invocation: d6e99c2a277a42ea88e743da36341fe9
+   Main PID: 4534 (uvicorn)
+      Tasks: 3 (limit: 4805)
+        CPU: 802ms
+     CGroup: /system.slice/sentinel-llm.service
+             └─4534 /opt/sentinel/llm-venv/bin/python3 /opt/sentinel/llm-venv/bin/uvicorn app:app --app-dir /opt/sentinel/share/sentinel/llm_service --host 127.0.0.1 --port 8090
+
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Started sentinel-llm.service - Sentinel reasoning service.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Started server process [4534]
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Waiting for application startup.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Application startup complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Uvicorn running on http://127.0.0.1:8090 (Press CTRL+C to quit)
+Jun 17 09:13:55 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49614 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:13:57 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49630 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:13:59 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49638 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:14:01 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49648 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:14:03 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49664 - "GET /health HTTP/1.1" 200 OK
+
+Recent sentinel-llm logs:
+Jun 16 10:12:28 kunmunpi5 systemd[1]: Started sentinel-llm.service - Sentinel reasoning service.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1723]: INFO:     Started server process [1723]
+Jun 16 10:12:29 kunmunpi5 uvicorn[1723]: INFO:     Waiting for application startup.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1723]: INFO:     Application startup complete.
+Jun 16 10:12:29 kunmunpi5 uvicorn[1723]: INFO:     Uvicorn running on http://127.0.0.1:8090 (Press CTRL+C to quit)
+Jun 17 09:13:37 kunmunpi5 systemd[1]: Stopping sentinel-llm.service - Sentinel reasoning service...
+Jun 17 09:13:38 kunmunpi5 uvicorn[1723]: INFO:     Shutting down
+Jun 17 09:13:38 kunmunpi5 uvicorn[1723]: INFO:     Waiting for application shutdown.
+Jun 17 09:13:38 kunmunpi5 uvicorn[1723]: INFO:     Application shutdown complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[1723]: INFO:     Finished server process [1723]
+Jun 17 09:13:38 kunmunpi5 systemd[1]: sentinel-llm.service: Deactivated successfully.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Stopped sentinel-llm.service - Sentinel reasoning service.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: sentinel-llm.service: Consumed 1.642s CPU time.
+Jun 17 09:13:38 kunmunpi5 systemd[1]: Started sentinel-llm.service - Sentinel reasoning service.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Started server process [4534]
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Waiting for application startup.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Application startup complete.
+Jun 17 09:13:38 kunmunpi5 uvicorn[4534]: INFO:     Uvicorn running on http://127.0.0.1:8090 (Press CTRL+C to quit)
+Jun 17 09:13:55 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49614 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:13:57 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49630 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:13:59 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49638 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:14:01 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49648 - "GET /health HTTP/1.1" 200 OK
+Jun 17 09:14:03 kunmunpi5 uvicorn[4534]: INFO:     127.0.0.1:49664 - "GET /health HTTP/1.1" 200 OK
+
+Dashboard health:
+{"status":"ok","latest_telemetry_ms":1781667970633}
+Latest KPI summary:
+{"samples":5,"diagnostic_samples":5,"normalized_samples":5,"source_fps_avg":14.972,"capture_fps_avg":14.324000000000002,"capture_delivery_percent_avg":95.688,"detection_fps_avg":4.772,"inference_ms_avg":54.076,"rtsp_reconnects":0,"last_frame_age_ms_max":2,"capture_read_avg_ms":66.824,"capture_read_max_ms":2681.52,"capture_slow_reads":443,"capture_slow_read_percent_avg":19.718,"events":{"scene":1},"event_quality":{"unique_tracks":1,"scene_entries":1,"scene_exits":0,"short_zone_exits":0,"loitering_events":0,"clip_events":0,"events_analyzed":1},"reasoning":{"requests":0,"successes":null,"fallbacks":null,"latency_ms_avg":null,"latency_ms_max":null,"success_rate_percent":null,"pending":0,"providers":[]}}
+Latest evaluations:
+[{"evaluation_id":"1781334723924-d1fdb852","timestamp_ms":1781334723924,"label":"expanded-pi5-baseline","provider":"mock","model":"sentinel-rules-v1","cases":15,"iterations":1,"runs":15,"successes":15,"correct_risk":15,"success_rate_percent":100.0,"risk_accuracy_percent":100.0,"latency_avg_ms":0.0,"latency_min_ms":0.0,"latency_max_ms":0.01,"latency_p95_ms":0.01,"per_risk_accuracy_json":"{\"low\":100.0,\"medium\":100.0,\"high\":100.0}","confusion_json":"{\"low\":{\"low\":5,\"medium\":0,\"high\":0,\"unknown\":0},\"medium\":{\"low\":0,\"medium\":5,\"high\":0,\"unknown\":0},\"high\":{\"low\":0,\"medium\":0,\"high\":5,\"unknown\":0}}"},{"evaluation_id":"1781334723924-d1fdb852","timestamp_ms":1781334723924,"label":"expanded-pi5-baseline","provider":"openai-cloud","model":"gpt-4.1-mini","cases":15,"iterations":1,"runs":15,"successes":15,"correct_risk":15,"success_rate_percent":100.0,"risk_accuracy_percent":100.0,"latency_avg_ms":1338.12,"latency_min_ms":989.35,"latency_max_ms":2470.84,"latency_p95_ms":2470.84,"per_risk_accuracy_json":"{\"low\":100.0,\"medium\":100.0,\"high\":100.0}","confusion_json":"{\"low\":{\"low\":5,\"medium\":0,\"high\":0,\"unknown\":0},\"medium\":{\"low\":0,\"medium\":5,\"high\":0,\"unknown\":0},\"high\":{\"low\":0,\"medium\":0,\"high\":5,\"unknown\":0}}"},{"evaluation_id":"1781334683725-3b8ead69","timestamp_ms":1781334683725,"label":"expanded-mock-baseline","provider":"mock","model":"sentinel-rules-v1","cases":15,"iterations":1,"runs":15,"successes":15,"correct_risk":15,"success_rate_percent":100.0,"risk_accuracy_percent":100.0,"latency_avg_ms":0.0,"latency_min_ms":0.0,"latency_max_ms":0.02,"latency_p95_ms":0.02,"per_risk_accuracy_json":"{\"low\":100.0,\"medium\":100.0,\"high\":100.0}","confusion_json":"{\"low\":{\"low\":5,\"medium\":0,\"high\":0,\"unknown\":0},\"medium\":{\"low\":0,\"medium\":5,\"high\":0,\"unknown\":0},\"high\":{\"low\":0,\"medium\":0,\"high\":5,\"unknown\":0}}"},{"evaluation_id":"1781333919331-dd4f3dd8","timestamp_ms":1781333919331,"label":"pi5-baseline","provider":"mock","model":"sentinel-rules-v1","cases":5,"iterations":1,"runs":5,"successes":5,"correct_risk":5,"success_rate_percent":100.0,"risk_accuracy_percent":100.0,"latency_avg_ms":0.01,"latency_min_ms":0.0,"latency_max_ms":0.02,"latency_p95_ms":null,"per_risk_accuracy_json":"{}","confusion_json":"{}"},{"evaluation_id":"1781333919331-dd4f3dd8","timestamp_ms":1781333919331,"label":"pi5-baseline","provider":"openai-cloud","model":"gpt-4.1-mini","cases":5,"iterations":1,"runs":5,"successes":5,"correct_risk":5,"success_rate_percent":100.0,"risk_accuracy_percent":100.0,"latency_avg_ms":1137.51,"latency_min_ms":935.14,"latency_max_ms":1501.41,"latency_p95_ms":null,"per_risk_accuracy_json":"{}","confusion_json":"{}"}]
+Reasoning health:
+{"status":"ok","default_provider":"openai-cloud","providers":["mock","openai-cloud"]}
+Reasoning providers:
+{"default":"openai-cloud","providers":[{"name":"mock","model":"sentinel-rules-v1","available":true,"status":"ready","detail":"Configuration is ready; endpoint reachability is verified on request."},{"name":"openai-cloud","model":"gpt-4.1-mini","available":true,"status":"ready","detail":"Configuration is ready; endpoint reachability is verified on request."}]}

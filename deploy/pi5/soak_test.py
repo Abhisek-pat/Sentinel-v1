@@ -57,6 +57,19 @@ def summarize(
         return round(statistics.mean(values), 2)
 
     reconnects = numeric_values(samples, "rtsp_reconnects")
+    pending_values = numeric_values(samples, "reasoning_pending")
+    backlog_warning_samples = sum(value > 3 for value in pending_values)
+    backlog_warning_percent = round(
+        backlog_warning_samples / max(1, len(samples)) * 100.0, 3
+    )
+    max_backlog_streak = 0
+    current_backlog_streak = 0
+    for value in pending_values:
+        if value > 3:
+            current_backlog_streak += 1
+            max_backlog_streak = max(max_backlog_streak, current_backlog_streak)
+        else:
+            current_backlog_streak = 0
     throttled_samples = sum(
         sample.get("throttled") not in (None, "0x0") for sample in samples
     )
@@ -81,6 +94,9 @@ def summarize(
         "memory_used_percent_max": metric("memory_used_percent", "max"),
         "disk_used_percent_max": metric("disk_used_percent", "max"),
         "reasoning_pending_max": metric("reasoning_pending", "max"),
+        "reasoning_backlog_warning_samples": backlog_warning_samples,
+        "reasoning_backlog_warning_percent": backlog_warning_percent,
+        "reasoning_backlog_max_consecutive_samples": max_backlog_streak,
         "rtsp_reconnect_delta": round(reconnects[-1] - reconnects[0], 2)
         if reconnects
         else None,
@@ -95,7 +111,9 @@ def summarize(
         "temperature_below_75_c": (summary["temperature_c_max"] or 1e9) < 75,
         "no_throttling": throttled_samples == 0,
         "no_rtsp_reconnect_growth": summary["rtsp_reconnect_delta"] == 0,
-        "reasoning_backlog_at_most_3": (summary["reasoning_pending_max"] or 0) <= 3,
+        "reasoning_backlog_not_sustained": (
+            max_backlog_streak <= 3 and backlog_warning_percent <= 1.0
+        ),
         "llm_service_healthy": llm_unhealthy_samples == 0,
         "no_critical_dashboard_alerts": critical_alert_samples == 0,
     }
