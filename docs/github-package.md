@@ -6,7 +6,11 @@
 - `docs/architecture.md` for runtime/data-flow architecture.
 - `docs/pi5-deployment.md` for deployment and validation commands.
 - `docs/portfolio.md` for interview-ready talking points.
+- `docs/demo-script.md` for a short LinkedIn/GitHub walkthrough plan.
+- `docs/edge-ai-architect-story.md` for the interview narrative.
 - `docs/assets/sentinel-data-flow.png` and `.svg` for the architecture diagram.
+- `deploy/pi5/run_gui_demo.sh` for showing the live OpenCV camera window on
+  Raspberry Pi Desktop or VNC.
 - `Results/sentinel-reports/` as the final evidence bundle.
 
 ## Evidence Bundle Contents
@@ -21,6 +25,7 @@
 | `llm-comparison.json` | Ranked LLM comparison data |
 | `llm-comparison.md` | Human-readable LLM comparison summary |
 | `sentinel-pi5-final-report.md` | Final one-page evidence report |
+| `dashboard-final.png` | Final operations dashboard screenshot |
 
 ## Do Not Include
 
@@ -55,3 +60,14 @@
 ```text
 Document Pi 5 validated deployment evidence
 ```
+
+## Optional Follow-Up Evidence
+
+If an INT8 model is added later, include:
+
+- `detector-comparison.json`
+- `detector-comparison.md`
+- `pi5-int8-smoke.json`
+
+Generate them with `deploy/pi5/analyze_detector_comparison.py` after running an
+INT8 smoke soak.

@@ -55,6 +55,7 @@ fi
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel.service" /etc/systemd/system/sentinel.service
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-dashboard.service" /etc/systemd/system/sentinel-dashboard.service
 install -m 0644 "${ROOT_DIR}/deploy/pi5/sentinel-llm.service" /etc/systemd/system/sentinel-llm.service
+chmod +x "${ROOT_DIR}/deploy/pi5/run_gui_demo.sh"
 
 python3 -m venv /opt/sentinel/dashboard-venv
 /opt/sentinel/dashboard-venv/bin/pip install --upgrade pip
@@ -74,6 +75,7 @@ python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_analyze_soak.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_analyze_evaluations.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_configure_llm_profiles.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_final_report.py -v
+python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_analyze_detector_comparison.py -v
 
 systemctl daemon-reload
 systemctl enable sentinel.service

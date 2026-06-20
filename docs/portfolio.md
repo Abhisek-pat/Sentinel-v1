@@ -14,6 +14,7 @@ Use `Results/sentinel-reports/` as the final evidence folder.
 | Artifact | Purpose |
 |---|---|
 | `sentinel-pi5-final-report.md` | One-page final evidence summary |
+| `dashboard-final.png` | Final operations dashboard screenshot |
 | `pi5-24h-soak.json` | Raw 24-hour stability report |
 | `pi5-24h-soak.md` | Human-readable 24-hour soak analysis |
 | `pi5-auth-smoke.json` | Authenticated dashboard smoke test |
@@ -35,7 +36,7 @@ Use `Results/sentinel-reports/` as the final evidence folder.
 | Dashboard auth smoke | PASS |
 | OpenAI reasoning baseline | 100% success, 100% risk accuracy |
 
-## Interview Talking Points
+## Main Highlights
 
 1. Real-time edge design: frame capture and inference stay local on the Pi, with
    RTSP newest-frame delivery to avoid stale processing.
@@ -54,7 +55,7 @@ Use `Results/sentinel-reports/` as the final evidence folder.
 
 ## Remaining Optional Enhancements
 
-1. INT8 detector comparison against representative clips.
+1. Run the INT8 detector comparison once `model_320_int8.onnx` is available.
 2. Local or LAN LLM profile once a Pi-friendly model endpoint is selected.
 3. Reverse proxy or VPN for secure remote dashboard access.
-4. Demo video showing dashboard, event clip, and reasoning assessment.
+4. Record the demo video using `docs/demo-script.md`.

@@ -24,6 +24,14 @@ The Pi 5 4 GB deployment has a completed evidence bundle under
 - `pi5-auth-smoke.json`: authenticated dashboard smoke test.
 - `llm-comparison.json` and `llm-comparison.md`: labeled reasoning baseline.
 - `sentinel-pi5-final-report.md`: final project evidence summary.
+- `dashboard-final.png`: final dashboard screenshot.
+
+For interview framing, see [`docs/portfolio.md`](docs/portfolio.md) and
+[`docs/edge-ai-architect-story.md`](docs/edge-ai-architect-story.md). For a
+short walkthrough recording plan, see [`docs/demo-script.md`](docs/demo-script.md).
+On Raspberry Pi Desktop or VNC, `deploy/pi5/run_gui_demo.sh` runs the same
+pipeline with `SENTINEL_HEADLESS=0` so the live OpenCV camera window can be
+recorded for a more visual demo.
 
 Current validated baseline:
 

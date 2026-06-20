@@ -51,6 +51,21 @@ sudo systemctl stop sentinel
 sudo bash deploy/pi5/diagnose.sh
 ```
 
+For a visual demo from Raspberry Pi Desktop or VNC, run Sentinel in foreground
+with the OpenCV window instead of the headless service:
+
+```bash
+bash deploy/pi5/run_gui_demo.sh
+```
+
+This stops `sentinel.service`, sets `SENTINEL_HEADLESS=0`, and writes demo clips
+and KPI files under `~/sentinel-demo`. Press `Q` or `Esc` inside the Sentinel
+window to stop, then restart the background service:
+
+```bash
+sudo systemctl start sentinel
+```
+
 ## KPI API
 
 The Pi installer deploys a lightweight FastAPI sidecar that ingests Sentinel's
@@ -292,6 +307,39 @@ stream resolution and clip buffering instead of increasing swap.
 The FP32 model is the compatibility-first baseline. After collecting Pi
 latency and detection-quality measurements, test an INT8 quantized model.
 Adopt it only if person detection remains reliable on representative footage.
+
+Expected INT8 candidate path:
+
+```text
+/opt/sentinel/share/sentinel/models/yolo/model_320_int8.onnx
+```
+
+Run a short candidate soak after installing the INT8 model and updating
+`SENTINEL_MODEL_PATH` in `/etc/sentinel/sentinel.env`:
+
+```bash
+sudo systemctl restart sentinel
+export SENTINEL_DASHBOARD_TOKEN=replace-with-a-long-random-token
+python3 deploy/pi5/soak_test.py \
+  --samples 30 \
+  --interval-sec 10 \
+  --output ~/sentinel-reports/pi5-int8-smoke.json
+```
+
+Compare FP32 and INT8:
+
+```bash
+python3 deploy/pi5/analyze_detector_comparison.py \
+  --baseline-report ~/sentinel-reports/pi5-auth-smoke.json \
+  --candidate-report ~/sentinel-reports/pi5-int8-smoke.json \
+  --baseline-label fp32 \
+  --candidate-label int8 \
+  --json-output ~/sentinel-reports/detector-comparison.json \
+  --markdown-output ~/sentinel-reports/detector-comparison.md
+```
+
+Adopt INT8 only if the comparison recommends adoption and manual review of
+representative clips still shows reliable person and loitering behavior.
 
 ## Portfolio Completion Checklist
 
