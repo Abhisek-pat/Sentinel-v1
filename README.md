@@ -1,8 +1,10 @@
 # Sentinel
 
-Sentinel is a real-time person-monitoring application built with C++17, OpenCV,
-ONNX Runtime, and a YOLOv8 ONNX model. It supports Windows and Raspberry Pi
-Linux builds.
+Sentinel is a real-time edge-AI person-monitoring system built with C++17,
+OpenCV, ONNX Runtime, and a YOLOv8 ONNX model. On Raspberry Pi 5 it runs as a
+headless `systemd` appliance with RTSP capture, local person detection, zone and
+loitering events, clip recording, KPI telemetry, an authenticated operations
+dashboard, and an asynchronous LLM reasoning sidecar.
 
 The CMake configuration detects the target automatically:
 
@@ -12,6 +14,35 @@ The CMake configuration detects the target automatically:
 
 The selected variant is printed during CMake configuration and when Sentinel
 starts.
+
+## Raspberry Pi 5 Evidence
+
+The Pi 5 4 GB deployment has a completed evidence bundle under
+`Results/sentinel-reports/`:
+
+- `pi5-24h-soak.json` and `pi5-24h-soak.md`: 24-hour stability run.
+- `pi5-auth-smoke.json`: authenticated dashboard smoke test.
+- `llm-comparison.json` and `llm-comparison.md`: labeled reasoning baseline.
+- `sentinel-pi5-final-report.md`: final project evidence summary.
+
+Current validated baseline:
+
+| Metric | Result |
+|---|---:|
+| 24-hour availability | 100.0% |
+| Capture FPS avg/min | 14.95 / 14.1 |
+| Detection FPS avg | 4.98 |
+| Inference avg/max | 54.4 / 59.06 ms |
+| Max temperature | 55.6 C |
+| RTSP reconnect delta | 0 |
+| Throttling | 0 samples |
+| Dashboard auth smoke | PASS |
+| OpenAI reasoning baseline | 100% success, 100% risk accuracy |
+
+Gemini free-tier comparison is intentionally deferred because provider quota
+limits caused `429`/`503` responses during evaluation. The production reasoning
+profile remains `openai-cloud` with `gpt-4.1-mini`; `mock` is retained as the
+deterministic fallback and latency baseline.
 
 ## Requirements
 
@@ -107,6 +138,12 @@ Run with an RTSP stream:
 For a Raspberry Pi 5 4 GB headless installation managed by `systemd`, see
 [`docs/pi5-deployment.md`](docs/pi5-deployment.md).
 
+The Pi deployment includes:
+
+- `sentinel.service` for the C++ vision pipeline.
+- `sentinel-dashboard.service` for the FastAPI KPI API and dashboard.
+- `sentinel-llm.service` for asynchronous reasoning and model evaluation.
+
 ## Other Video Sources
 
 A video-file path can be passed instead of a webcam index or RTSP URL:
@@ -122,5 +159,6 @@ are saved under `data/clips/`.
 
 - Run Sentinel from the repository root so the relative model path resolves.
 - Generic desktop Linux and macOS targets are currently rejected by CMake.
-- The optional FastAPI/OpenAI reasoning service exists under `llm_service/`,
-  but it is not connected to the current C++ runtime.
+- On Pi, loitering events queue asynchronous reasoning requests under
+  `/var/lib/sentinel/kpi`; provider latency does not block capture or
+  inference.

@@ -49,3 +49,8 @@ __pycache__/
 
 .venv/
 venv/
+
+# Temporary evidence staging folders. Keep Results/sentinel-reports/ as the
+# canonical portfolio evidence bundle.
+Results/sentinel-reports_new/
+Results/sentinel-reports_old/

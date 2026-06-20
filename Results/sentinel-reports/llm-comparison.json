@@ -1,0 +1,86 @@
+{
+  "evaluation_id": "1781334723924-d1fdb852",
+  "label": "expanded-pi5-baseline",
+  "providers": [
+    {
+      "rank": 1,
+      "provider": "mock",
+      "model": "sentinel-rules-v1",
+      "cases": 15,
+      "iterations": 1,
+      "runs": 15,
+      "successes": 15,
+      "correct_risk": 15,
+      "success_rate_percent": 100.0,
+      "risk_accuracy_percent": 100.0,
+      "latency_avg_ms": 0.0,
+      "latency_p95_ms": 0.01,
+      "latency_max_ms": 0.01,
+      "per_risk_accuracy": {
+        "low": 100.0,
+        "medium": 100.0,
+        "high": 100.0
+      },
+      "confusion": {
+        "low": {
+          "low": 5,
+          "medium": 0,
+          "high": 0,
+          "unknown": 0
+        },
+        "medium": {
+          "low": 0,
+          "medium": 5,
+          "high": 0,
+          "unknown": 0
+        },
+        "high": {
+          "low": 0,
+          "medium": 0,
+          "high": 5,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "rank": 2,
+      "provider": "openai-cloud",
+      "model": "gpt-4.1-mini",
+      "cases": 15,
+      "iterations": 1,
+      "runs": 15,
+      "successes": 15,
+      "correct_risk": 15,
+      "success_rate_percent": 100.0,
+      "risk_accuracy_percent": 100.0,
+      "latency_avg_ms": 1338.12,
+      "latency_p95_ms": 2470.84,
+      "latency_max_ms": 2470.84,
+      "per_risk_accuracy": {
+        "low": 100.0,
+        "medium": 100.0,
+        "high": 100.0
+      },
+      "confusion": {
+        "low": {
+          "low": 5,
+          "medium": 0,
+          "high": 0,
+          "unknown": 0
+        },
+        "medium": {
+          "low": 0,
+          "medium": 5,
+          "high": 0,
+          "unknown": 0
+        },
+        "high": {
+          "low": 0,
+          "medium": 0,
+          "high": 5,
+          "unknown": 0
+        }
+      }
+    }
+  ]
+}

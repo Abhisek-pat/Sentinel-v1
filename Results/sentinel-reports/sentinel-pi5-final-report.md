@@ -22,20 +22,21 @@ Sentinel is portfolio-ready on Raspberry Pi 5 for authenticated LAN operation wi
 
 | Metric | Value |
 |---|---:|
-| Authenticated smoke result | UNKNOWN |
-| Capture FPS avg/min | None / None |
-| Inference avg/max | None / None ms |
-| Temperature max | None C |
+| Authenticated smoke result | PASS |
+| Capture FPS avg/min | 14.93 / 14.87 |
+| Inference avg/max | 54.59 / 55.79 ms |
+| Temperature max | 49.6 C |
 
 ## LLM Reasoning Baseline
 
 | Provider | Model | Success | Risk Accuracy | Avg Latency | P95 Latency |
 |---|---|---:|---:|---:|---:|
-| -- | -- | -- | -- | -- | -- |
+| mock | sentinel-rules-v1 | 100.0% | 100.0% | 0.0 ms | 0.01 ms |
+| openai-cloud | gpt-4.1-mini | 100.0% | 100.0% | 1338.12 ms | 2470.84 ms |
 
 ## Recommendation
 
-Use the currently validated OpenAI profile as the production reasoning provider.
+Use `openai-cloud` / `gpt-4.1-mini` as the current reasoning provider.
 Keep Gemini disabled for automated comparison until paid quota or a slower rate-limited evaluator is required.
 
 ## Next Gates
