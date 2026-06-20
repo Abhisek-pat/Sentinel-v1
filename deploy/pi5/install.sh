@@ -73,6 +73,7 @@ python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_soak_test.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_analyze_soak.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_analyze_evaluations.py -v
 python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_configure_llm_profiles.py -v
+python3 -m unittest discover -s "${ROOT_DIR}/tests" -p test_final_report.py -v
 
 systemctl daemon-reload
 systemctl enable sentinel.service

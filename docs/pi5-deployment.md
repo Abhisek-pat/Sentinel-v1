@@ -354,3 +354,18 @@ python3 deploy/pi5/analyze_soak.py \
   ~/sentinel-reports/pi5-24h-soak.json \
   --markdown-output ~/sentinel-reports/pi5-24h-soak.md
 ```
+
+Generate a final portfolio evidence report after the authenticated smoke test,
+24-hour soak, and model baseline are available:
+
+```bash
+python3 deploy/pi5/final_report.py \
+  --soak-report ~/sentinel-reports/pi5-24h-soak.json \
+  --auth-smoke-report ~/sentinel-reports/pi5-auth-smoke.json \
+  --evaluation-report ~/sentinel-reports/llm-comparison.json \
+  --markdown-output ~/sentinel-reports/sentinel-pi5-final-report.md
+```
+
+Attach that markdown report, the 24-hour soak JSON, and the dashboard screenshot
+as final project evidence. Multi-cloud LLM comparison can remain deferred until
+Gemini quota is upgraded or a rate-limited evaluator is needed.
