@@ -326,10 +326,15 @@ bool Pipeline::run() {
                 }
             }
 
+            const bool active_loitering = std::any_of(
+                person_loitering_flags.begin(),
+                person_loitering_flags.end(),
+                [](bool is_loitering) { return is_loitering; });
+
             if (person_detections.empty()) {
                 llm_summary = "No active person detected.";
                 llm_risk = "low";
-            } else if (loitering_detected) {
+            } else if (active_loitering || loitering_detected) {
                 llm_summary = "Loitering detected in monitored zone.";
                 llm_risk = "medium";
             } else {
