@@ -187,8 +187,8 @@ bool Pipeline::run() {
     double last_clip_save_time_sec = -1000.0;
     double last_reasoning_request_time_sec = -1000.0;
 
-    std::string llm_summary = "Local vision mode: LLM disabled.";
-    std::string llm_risk = "low";
+    std::string risk_summary = "Waiting for detections.";
+    std::string risk_level = "low";
 
     std::vector<Detection> tracked_detections;
     std::vector<Detection> person_detections;
@@ -332,14 +332,14 @@ bool Pipeline::run() {
                 [](bool is_loitering) { return is_loitering; });
 
             if (person_detections.empty()) {
-                llm_summary = "No active person detected.";
-                llm_risk = "low";
+                risk_summary = "No active person detected.";
+                risk_level = "low";
             } else if (active_loitering || loitering_detected) {
-                llm_summary = "Loitering detected in monitored zone.";
-                llm_risk = "medium";
+                risk_summary = "Loitering detected in monitored zone.";
+                risk_level = "medium";
             } else {
-                llm_summary = "Person detected. Monitoring active.";
-                llm_risk = "low";
+                risk_summary = "Person detected. Monitoring active.";
+                risk_level = "low";
             }
 
             SceneState scene_state = scene_state_builder.build(
@@ -446,7 +446,7 @@ bool Pipeline::run() {
             zone_manager.drawZones(frame);
             overlay_renderer.drawDetections(frame, person_detections);
             overlay_renderer.drawStats(frame, pipeline_fps, displayed_frame_time_ms, source_label);
-            overlay_renderer.drawLlmOutput(frame, llm_summary, llm_risk);
+            overlay_renderer.drawRiskState(frame, risk_summary, risk_level);
             overlay_renderer.drawEvents(frame, recent_events);
 
             cv::imshow(window_name, frame);

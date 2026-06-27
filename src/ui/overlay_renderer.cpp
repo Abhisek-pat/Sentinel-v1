@@ -118,7 +118,7 @@ void OverlayRenderer::drawEvents(cv::Mat& frame,
     }
 }
 
-void OverlayRenderer::drawLlmOutput(cv::Mat& frame,
+void OverlayRenderer::drawRiskState(cv::Mat& frame,
                                     const std::string& summary,
                                     const std::string& risk_level) const {
     const int panel_x = 10;
@@ -144,7 +144,7 @@ void OverlayRenderer::drawLlmOutput(cv::Mat& frame,
                   1);
 
     drawTextLine(frame,
-                 "LLM Assessment",
+                 "Edge Risk State",
                  panel_x + 10,
                  panel_y + 22,
                  0.55,

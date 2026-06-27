@@ -20,7 +20,7 @@ public:
     void drawEvents(cv::Mat& frame,
                     const std::vector<std::string>& events) const;
 
-    void drawLlmOutput(cv::Mat& frame,
+    void drawRiskState(cv::Mat& frame,
                        const std::string& summary,
                        const std::string& risk_level) const;
 
